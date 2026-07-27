@@ -226,7 +226,8 @@ if (runtime) {
     new THREE.MeshStandardMaterial({
       color: 0xe5e1d9,
       roughness: 1,
-      metalness: 0
+      metalness: 0,
+      dithering: true
     })
   );
   wall.position.z = -3.25;
@@ -239,13 +240,11 @@ if (runtime) {
   key.position.set(-4.5, 6.5, 8);
   key.target.position.set(0.4, -0.2, 0);
   key.castShadow = true;
-  key.shadow.mapSize.set(isCompact ? 512 : 1024, isCompact ? 512 : 1024);
-  key.shadow.camera.near = 1;
-  key.shadow.camera.far = 16;
-  key.shadow.camera.left = -4.6;
-  key.shadow.camera.right = 4.6;
-  key.shadow.camera.top = 4.2;
-  key.shadow.camera.bottom = -4.2;
+  key.shadow.mapSize.set(isCompact ? 1024 : 2048, isCompact ? 1024 : 2048);
+  key.shadow.camera.near = 0.5;
+  key.shadow.camera.far = 40;
+  key.shadow.intensity = 0.78;
+  key.shadow.radius = isCompact ? 1.35 : 2.15;
   key.shadow.bias = -0.0005;
   key.shadow.normalBias = 0.025;
   scene.add(key, key.target);
@@ -261,12 +260,30 @@ if (runtime) {
   let baseCameraZ = 10.2;
   let animationFrame;
 
+  const setShadowCoverage = () => {
+    const wallDistance = baseCameraZ - wall.position.z;
+    const viewHalfHeight =
+      Math.tan(THREE.MathUtils.degToRad(camera.fov * 0.5)) * wallDistance;
+    const shadowHalfWidth = Math.max(
+      20,
+      viewHalfHeight * camera.aspect * 2.4
+    );
+    const shadowHalfHeight = Math.max(16, viewHalfHeight * 2.4);
+
+    key.shadow.camera.left = -shadowHalfWidth;
+    key.shadow.camera.right = shadowHalfWidth;
+    key.shadow.camera.top = shadowHalfHeight;
+    key.shadow.camera.bottom = -shadowHalfHeight;
+    key.shadow.camera.updateProjectionMatrix();
+  };
+
   const setResponsiveFraming = () => {
     fitPerspectiveCamera(camera);
     const portrait = window.innerHeight > window.innerWidth;
     baseCameraZ = portrait ? 11.9 : 10.2;
     camera.position.z = baseCameraZ;
     sculpture.scale.setScalar(portrait ? 0.92 : 1);
+    setShadowCoverage();
   };
 
   const setAtmosphere = (x = 0, y = 0, pulse = 0) => {

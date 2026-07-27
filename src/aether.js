@@ -184,7 +184,7 @@ if (runtime) {
         1
       );
     }
-    uniforms.uTime.value = reducedMotion ? 18.0 : elapsed;
+    uniforms.uTime.value = reducedMotion ? 18.0 : elapsed / 3;
 
     if (identity) {
       identity.style.setProperty(

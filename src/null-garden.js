@@ -20,13 +20,13 @@ if (runtime) {
     (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4);
   const motionStrength = isCompact ? 0.58 : 1;
 
-  renderer.toneMappingExposure = 0.92;
+  renderer.toneMappingExposure = 1.12;
   renderer.shadowMap.enabled = !isCompact;
   renderer.shadowMap.type = THREE.PCFShadowMap;
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x080b08);
-  scene.fog = new THREE.FogExp2(0x0b100c, isCompact ? 0.043 : 0.036);
+  scene.background = new THREE.Color(0x05080a);
+  scene.fog = new THREE.FogExp2(0x071113, isCompact ? 0.041 : 0.033);
 
   const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 70);
   camera.position.set(0, 4.5, 13.8);
@@ -121,11 +121,19 @@ if (runtime) {
         veil *= smoothstep(-0.34, 0.05, vDirection.y) *
           (1.0 - smoothstep(0.20, 0.66, vDirection.y));
         float grain = random(floor((vDirection.xy + uTime * 0.0008) * 240.0));
-        vec3 earth = vec3(0.046, 0.052, 0.036);
-        vec3 voidColor = vec3(0.010, 0.016, 0.014);
+        float aurora = pow(veil, 2.2) * (0.28 + 0.72 * sin(vDirection.x * 5.0 - uTime * 0.018) * 0.5 + 0.36);
+        float polar = smoothstep(-0.24, 0.03, vDirection.y) *
+          (1.0 - smoothstep(0.24, 0.7, vDirection.y));
+        vec3 earth = vec3(0.030, 0.048, 0.039);
+        vec3 voidColor = vec3(0.004, 0.009, 0.015);
         vec3 color = mix(earth, voidColor, horizon);
-        color += vec3(0.070, 0.088, 0.050) * glow;
-        color += vec3(0.025, 0.034, 0.017) * veil;
+        color += vec3(0.030, 0.145, 0.125) * glow;
+        color += mix(
+          vec3(0.015, 0.18, 0.16),
+          vec3(0.21, 0.028, 0.18),
+          sin(vDirection.x * 7.0 + uTime * 0.012) * 0.5 + 0.5
+        ) * aurora * polar * 0.34;
+        color += vec3(0.19, 0.11, 0.025) * pow(veil, 8.0) * polar * 0.22;
         color += (grain - 0.5) * 0.008;
         gl_FragColor = vec4(color, 1.0);
       }
@@ -134,6 +142,57 @@ if (runtime) {
   animatedMaterials.push(skyMaterial);
   disposables.push(skyGeometry, skyMaterial);
   scene.add(new THREE.Mesh(skyGeometry, skyMaterial));
+
+  const environmentScene = new THREE.Scene();
+  environmentScene.background = new THREE.Color(0x010305);
+  const environmentRoomGeometry = new THREE.SphereGeometry(28, 24, 12);
+  const environmentRoomMaterial = new THREE.MeshBasicMaterial({
+    color: 0x081114,
+    side: THREE.BackSide
+  });
+  environmentScene.add(
+    new THREE.Mesh(environmentRoomGeometry, environmentRoomMaterial)
+  );
+
+  const environmentPanelGeometry = new THREE.PlaneGeometry(10, 18);
+  const environmentPanelColors = [
+    [0x16ffe0, [-9, 3, 2], [2.2, 1, 1]],
+    [0xff2fcf, [8, 5, -4], [1.35, 1, 1]],
+    [0xffb13b, [1, -8, 2], [1.8, 0.8, 1]],
+    [0x5276ff, [-2, 8, -9], [1.4, 0.55, 1]]
+  ];
+  const environmentPanelMaterials = [];
+
+  environmentPanelColors.forEach(([color, position, scale]) => {
+    const panelMaterial = new THREE.MeshBasicMaterial({
+      color,
+      side: THREE.DoubleSide,
+      toneMapped: false
+    });
+    const panel = new THREE.Mesh(environmentPanelGeometry, panelMaterial);
+    panel.position.fromArray(position);
+    panel.scale.fromArray(scale);
+    panel.lookAt(0, 0, 0);
+    environmentScene.add(panel);
+    environmentPanelMaterials.push(panelMaterial);
+  });
+
+  const pmremGenerator = new THREE.PMREMGenerator(renderer);
+  const environmentTarget = pmremGenerator.fromScene(
+    environmentScene,
+    0.035,
+    0.1,
+    80,
+    { size: isCompact ? 128 : 256 }
+  );
+  scene.environment = environmentTarget.texture;
+  scene.environmentIntensity = isCompact ? 0.85 : 1.16;
+  pmremGenerator.dispose();
+  environmentRoomGeometry.dispose();
+  environmentRoomMaterial.dispose();
+  environmentPanelGeometry.dispose();
+  environmentPanelMaterials.forEach((material) => material.dispose());
+  disposables.push(environmentTarget);
 
   const terrainSegments = isCompact ? [58, 46] : [104, 82];
   const terrainGeometry = new THREE.PlaneGeometry(
@@ -146,8 +205,8 @@ if (runtime) {
 
   const terrainPositions = terrainGeometry.attributes.position;
   const terrainColors = new Float32Array(terrainPositions.count * 3);
-  const lowColor = new THREE.Color(0x11150f);
-  const highColor = new THREE.Color(0x39412a);
+  const lowColor = new THREE.Color(0x07100e);
+  const highColor = new THREE.Color(0x25463d);
   const soilColor = new THREE.Color();
 
   for (let index = 0; index < terrainPositions.count; index += 1) {
@@ -174,12 +233,12 @@ if (runtime) {
   terrainGeometry.computeVertexNormals();
 
   const terrainMaterial = new THREE.MeshStandardMaterial({
-    color: 0x80906a,
+    color: 0x71968b,
     vertexColors: true,
     roughness: 0.94,
     metalness: 0.03,
-    emissive: 0x11160c,
-    emissiveIntensity: 0.12,
+    emissive: 0x071c19,
+    emissiveIntensity: 0.2,
     flatShading: true
   });
   const terrain = new THREE.Mesh(terrainGeometry, terrainMaterial);
@@ -187,10 +246,93 @@ if (runtime) {
   garden.add(terrain);
   disposables.push(terrainGeometry, terrainMaterial);
 
+  const poolY = terrainHeight(0, -2) + 0.16;
+  const poolGeometry = new THREE.CircleGeometry(
+    6.2,
+    isCompact ? 64 : 112
+  );
+  poolGeometry.rotateX(-Math.PI / 2);
+  const poolMaterial = new THREE.MeshPhysicalMaterial({
+    color: 0x061417,
+    roughness: isCompact ? 0.18 : 0.075,
+    metalness: 0.96,
+    clearcoat: 1,
+    clearcoatRoughness: 0.08,
+    iridescence: isCompact ? 0.24 : 0.7,
+    iridescenceIOR: 1.52,
+    iridescenceThicknessRange: [160, 520],
+    emissive: 0x031110,
+    emissiveIntensity: 0.32,
+    side: THREE.DoubleSide
+  });
+  const mirrorPool = new THREE.Mesh(poolGeometry, poolMaterial);
+  mirrorPool.position.set(0, poolY, -2);
+  mirrorPool.receiveShadow = !isCompact;
+  mirrorPool.renderOrder = 1;
+  garden.add(mirrorPool);
+  disposables.push(poolGeometry, poolMaterial);
+
+  const causticGeometry = new THREE.RingGeometry(
+    0.72,
+    6.12,
+    isCompact ? 72 : 128,
+    1
+  );
+  causticGeometry.rotateX(-Math.PI / 2);
+  const causticMaterial = new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide,
+    uniforms: {
+      uTime: { value: 0 },
+      uPointer: { value: new THREE.Vector2() }
+    },
+    vertexShader: `
+      varying vec2 vUv;
+
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      varying vec2 vUv;
+      uniform float uTime;
+      uniform vec2 uPointer;
+
+      void main() {
+        vec2 p = vUv - 0.5;
+        p += uPointer * 0.006;
+        float radius = length(p) * 2.0;
+        float angle = atan(p.y, p.x);
+        float spiral = sin(radius * 49.0 - angle * 9.0 - uTime * 0.34);
+        float counter = sin(radius * 32.0 + angle * 13.0 + uTime * 0.21);
+        float veins = pow(max(0.0, spiral * counter), 7.0);
+        float rings = pow(max(0.0, sin(radius * 61.0 - uTime * 0.16)), 18.0);
+        float fade = smoothstep(1.0, 0.72, radius) *
+          smoothstep(0.08, 0.28, radius);
+        vec3 cyan = vec3(0.05, 0.95, 0.82);
+        vec3 orchid = vec3(0.92, 0.09, 0.75);
+        vec3 gold = vec3(1.0, 0.56, 0.12);
+        vec3 color = mix(cyan, orchid, sin(angle * 2.0 - uTime * 0.08) * 0.5 + 0.5);
+        color = mix(color, gold, rings * 0.48);
+        float alpha = fade * (veins * 0.22 + rings * 0.055);
+        gl_FragColor = vec4(color, alpha);
+      }
+    `
+  });
+  const poolCaustics = new THREE.Mesh(causticGeometry, causticMaterial);
+  poolCaustics.position.set(0, poolY + 0.028, -2);
+  poolCaustics.renderOrder = 2;
+  garden.add(poolCaustics);
+  animatedMaterials.push(causticMaterial);
+  disposables.push(causticGeometry, causticMaterial);
+
   const rootPositions = [];
   const rootColors = [];
-  const rootDark = new THREE.Color(0x38452d);
-  const rootLight = new THREE.Color(0x9ba969);
+  const rootDark = new THREE.Color(0x123f3d);
+  const rootLight = new THREE.Color(0x72e6ca);
   const rootColor = new THREE.Color();
 
   for (let ribbon = 0; ribbon < 11; ribbon += 1) {
@@ -249,8 +391,8 @@ if (runtime) {
   const monolithGeometry = new THREE.IcosahedronGeometry(1, isCompact ? 2 : 3);
   const monolithPositions = monolithGeometry.attributes.position;
   const monolithColors = new Float32Array(monolithPositions.count * 3);
-  const stoneLow = new THREE.Color(0x070907);
-  const stoneHigh = new THREE.Color(0x263026);
+  const stoneLow = new THREE.Color(0x030809);
+  const stoneHigh = new THREE.Color(0x245a58);
   const stoneColor = new THREE.Color();
 
   for (let index = 0; index < monolithPositions.count; index += 1) {
@@ -281,22 +423,22 @@ if (runtime) {
   );
   monolithGeometry.computeVertexNormals();
 
-  const monolithClearcoat = isCompact ? 0.2 : 0.34;
+  const monolithClearcoat = isCompact ? 0.42 : 0.86;
   const monolithMaterial = new THREE.MeshPhysicalMaterial({
-    color: 0x849080,
+    color: 0x92c5bd,
     vertexColors: true,
-    roughness: 0.29,
-    metalness: 0.5,
-    clearcoat: monolithClearcoat,
-    clearcoatRoughness: 0.3,
-    iridescence: isCompact ? 0 : 0.16,
-    iridescenceIOR: 1.36,
-    iridescenceThicknessRange: [120, 310],
-    sheen: isCompact ? 0 : 0.13,
-    sheenColor: 0x718069,
-    sheenRoughness: 0.68,
-    emissive: 0x090e08,
-    emissiveIntensity: 0.2,
+    roughness: isCompact ? 0.24 : 0.13,
+    metalness: 0.76,
+    clearcoat: isCompact ? 0.42 : 0.86,
+    clearcoatRoughness: 0.16,
+    iridescence: isCompact ? 0.18 : 0.72,
+    iridescenceIOR: 1.48,
+    iridescenceThicknessRange: [110, 470],
+    sheen: isCompact ? 0 : 0.22,
+    sheenColor: 0x8bfff0,
+    sheenRoughness: 0.44,
+    emissive: 0x061a1b,
+    emissiveIntensity: 0.3,
     flatShading: true
   });
   const monolith = new THREE.Mesh(monolithGeometry, monolithMaterial);
@@ -310,9 +452,9 @@ if (runtime) {
 
   const facetGeometry = new THREE.EdgesGeometry(monolithGeometry, 19);
   const facetMaterial = new THREE.LineBasicMaterial({
-    color: 0x839273,
+    color: 0x8cfff0,
     transparent: true,
-    opacity: 0.2,
+    opacity: 0.34,
     blending: THREE.AdditiveBlending,
     depthWrite: false
   });
@@ -369,10 +511,11 @@ if (runtime) {
         );
         float alpha = fresnel * (0.045 + scan * 0.11);
         vec3 color = mix(
-          vec3(0.20, 0.34, 0.16),
-          vec3(0.58, 0.72, 0.36),
+          vec3(0.02, 0.92, 0.78),
+          vec3(0.98, 0.11, 0.76),
           scan
         );
+        color = mix(color, vec3(1.0, 0.62, 0.18), fresnel * 0.24);
         gl_FragColor = vec4(color, alpha);
       }
     `
@@ -384,10 +527,98 @@ if (runtime) {
   animatedMaterials.push(shellMaterial);
   disposables.push(shellMaterial);
 
+  const spectralCrown = new THREE.Group();
+  spectralCrown.position.copy(monolith.position);
+  garden.add(spectralCrown);
+
+  const prismCount = isCompact ? 12 : 22;
+  const prismGeometry = new THREE.OctahedronGeometry(0.21, 0);
+  prismGeometry.scale(0.44, 1.9, 0.44);
+  const prismMaterial = new THREE.MeshPhysicalMaterial({
+    color: 0xd8fffa,
+    vertexColors: true,
+    roughness: 0.12,
+    metalness: 0.68,
+    clearcoat: 1,
+    clearcoatRoughness: 0.08,
+    iridescence: isCompact ? 0.25 : 0.9,
+    iridescenceIOR: 1.56,
+    iridescenceThicknessRange: [100, 560],
+    emissive: 0x082a29,
+    emissiveIntensity: 0.34,
+    flatShading: true
+  });
+  const prisms = new THREE.InstancedMesh(
+    prismGeometry,
+    prismMaterial,
+    prismCount
+  );
+  const prismDummy = new THREE.Object3D();
+  const prismColor = new THREE.Color();
+  const prismPalette = [0x4ffff0, 0xff48cf, 0xffb642, 0x7796ff];
+
+  for (let index = 0; index < prismCount; index += 1) {
+    const angle = (index / prismCount) * Math.PI * 2;
+    const radius = 2.72 + Math.sin(index * 2.17) * 0.28;
+    prismDummy.position.set(
+      Math.cos(angle) * radius,
+      Math.sin(angle) * (3.35 + Math.cos(index * 1.3) * 0.16),
+      -0.16 + Math.sin(index * 1.91) * 0.58
+    );
+    prismDummy.rotation.set(
+      angle * 0.7,
+      -angle + Math.PI * 0.5,
+      angle + Math.PI * 0.5
+    );
+    prismDummy.scale.setScalar(0.62 + hash(index, 93.2) * 0.72);
+    prismDummy.updateMatrix();
+    prisms.setMatrixAt(index, prismDummy.matrix);
+    prismColor
+      .set(prismPalette[index % prismPalette.length])
+      .multiplyScalar(0.72 + hash(index, 11.4) * 0.28);
+    prisms.setColorAt(index, prismColor);
+  }
+  prisms.instanceMatrix.needsUpdate = true;
+  if (prisms.instanceColor) prisms.instanceColor.needsUpdate = true;
+  spectralCrown.add(prisms);
+  disposables.push(prismGeometry, prismMaterial);
+
+  const spectralArcs = [];
+  const arcPalette = [0x4ffff0, 0xff43ca, 0xffbd55, 0x758fff, 0x91fff0];
+  const arcGroup = new THREE.Group();
+  arcGroup.position.copy(monolith.position);
+  garden.add(arcGroup);
+
+  for (let index = 0; index < 6; index += 1) {
+    const arcGeometry = new THREE.TorusGeometry(
+      2.45 + index * 0.31,
+      0.009 + (index % 2) * 0.006,
+      4,
+      isCompact ? 72 : 112,
+      Math.PI * (0.48 + index * 0.075)
+    );
+    const arcMaterial = new THREE.MeshBasicMaterial({
+      color: arcPalette[index % arcPalette.length],
+      transparent: true,
+      opacity: 0.18 + (index % 3) * 0.035,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      toneMapped: false
+    });
+    const arc = new THREE.Mesh(arcGeometry, arcMaterial);
+    arc.rotation.z = index * 1.13 - 1.8;
+    arc.rotation.x = (index - 2.5) * 0.035;
+    arc.position.z = -0.35 + index * 0.12;
+    arc.userData.phase = index * 1.37;
+    arcGroup.add(arc);
+    spectralArcs.push(arc);
+    disposables.push(arcGeometry, arcMaterial);
+  }
+
   const tendrilGroup = new THREE.Group();
   tendrilGroup.position.copy(monolith.position);
   garden.add(tendrilGroup);
-  const tendrilColors = [0x7f9854, 0x657e58, 0xa4aa62];
+  const tendrilColors = [0x48ffe8, 0xff47c8, 0xffb64d];
 
   for (let strand = 0; strand < 3; strand += 1) {
     const points = [];
@@ -485,13 +716,14 @@ if (runtime) {
         float hollow = smoothstep(0.04, 0.22, radius);
         float outerRing = smoothstep(0.46, 0.27, radius) *
           smoothstep(0.13, 0.3, radius);
-        float alpha = body * hollow * (0.012 + current * 0.026);
-        alpha += outerRing * (0.007 + breath * 0.009);
+        float alpha = body * hollow * (0.02 + current * 0.046);
+        alpha += outerRing * (0.012 + breath * 0.018);
         vec3 color = mix(
-          vec3(0.18, 0.23, 0.11),
-          vec3(0.38, 0.43, 0.25),
+          vec3(0.02, 0.86, 0.72),
+          vec3(0.89, 0.08, 0.68),
           current
         );
+        color = mix(color, vec3(1.0, 0.58, 0.16), outerRing * breath * 0.36);
         gl_FragColor = vec4(color, alpha);
       }
     `
@@ -505,11 +737,11 @@ if (runtime) {
   disposables.push(auraGeometry, auraMaterial);
 
   const ringMaterial = new THREE.MeshStandardMaterial({
-    color: 0x313824,
-    emissive: 0x11180d,
-    emissiveIntensity: 0.58,
-    roughness: 0.48,
-    metalness: 0.6
+    color: 0x2b8278,
+    emissive: 0x063d38,
+    emissiveIntensity: 0.88,
+    roughness: 0.2,
+    metalness: 0.86
   });
   disposables.push(ringMaterial);
 
@@ -547,9 +779,9 @@ if (runtime) {
   );
   stalkGeometry.translate(0, 0.5, 0);
   const stalkMaterial = new THREE.MeshStandardMaterial({
-    color: 0x566444,
-    roughness: 0.72,
-    metalness: 0.12,
+    color: 0x3b756c,
+    roughness: 0.6,
+    metalness: 0.24,
     flatShading: true,
     vertexColors: false
   });
@@ -618,9 +850,9 @@ if (runtime) {
     stalks.setMatrixAt(index, dummy.matrix);
 
     stalkColor.setHSL(
-      0.19 + randomA * 0.055,
-      0.24 + randomB * 0.14,
-      0.13 + randomB * 0.12
+      0.43 + randomA * 0.12,
+      0.34 + randomB * 0.26,
+      0.12 + randomB * 0.16
     );
     stalks.setColorAt(index, stalkColor);
   }
@@ -635,11 +867,11 @@ if (runtime) {
   const crownCount = isCompact ? 34 : 74;
   const crownGeometry = new THREE.OctahedronGeometry(0.14, 0);
   const crownMaterial = new THREE.MeshStandardMaterial({
-    color: 0x9b9b67,
-    emissive: 0x11150a,
-    emissiveIntensity: 0.04,
-    roughness: 0.38,
-    metalness: 0.48,
+    color: 0xa5eee0,
+    emissive: 0x072b2b,
+    emissiveIntensity: 0.16,
+    roughness: 0.2,
+    metalness: 0.74,
     flatShading: true
   });
   const crowns = new THREE.InstancedMesh(
@@ -737,7 +969,12 @@ if (runtime) {
         float distanceToCenter = length(gl_PointCoord - 0.5);
         float alpha = smoothstep(0.5, 0.05, distanceToCenter) *
           0.42 * vFade * vShimmer;
-        gl_FragColor = vec4(vec3(0.60, 0.68, 0.39), alpha);
+        vec3 color = mix(
+          vec3(0.20, 1.0, 0.82),
+          vec3(1.0, 0.18, 0.72),
+          vShimmer
+        );
+        gl_FragColor = vec4(color, alpha);
       }
     `
   });
@@ -747,13 +984,13 @@ if (runtime) {
   disposables.push(sporeGeometry, sporeMaterial);
 
   const hemisphereLight = new THREE.HemisphereLight(
-    0x718578,
-    0x1b160e,
-    0.58
+    0x76d9d1,
+    0x1c071c,
+    0.72
   );
   scene.add(hemisphereLight);
 
-  const keyLight = new THREE.DirectionalLight(0xc6d7b5, 2.65);
+  const keyLight = new THREE.DirectionalLight(0xc7fff5, 3.3);
   keyLight.position.set(-7, 10, 7);
   keyLight.target.position.set(0, 0, -3);
   keyLight.castShadow = !isCompact;
@@ -770,13 +1007,13 @@ if (runtime) {
   }
   scene.add(keyLight, keyLight.target);
 
-  const underLight = new THREE.PointLight(0xa3b456, 35, 11, 2);
+  const underLight = new THREE.PointLight(0x28ffe0, 58, 13, 2);
   underLight.position.set(0, -0.2, -1.8);
   scene.add(underLight);
 
   const rimLight = new THREE.SpotLight(
-    0x9daac6,
-    170,
+    0xff37c5,
+    230,
     38,
     Math.PI * 0.18,
     0.72,
@@ -785,6 +1022,10 @@ if (runtime) {
   rimLight.position.set(7, 7, -11);
   rimLight.target.position.set(0, 2, -2.5);
   scene.add(rimLight, rimLight.target);
+
+  const emberLight = new THREE.PointLight(0xff9a32, 42, 15, 2);
+  emberLight.position.set(-4.8, 1.2, 0.4);
+  scene.add(emberLight);
 
   const clockState = { elapsed: 0 };
   let lastIdentityX = Number.NaN;
@@ -861,14 +1102,14 @@ if (runtime) {
         ? 0
         : Math.cos(motionTime * 0.115) * 0.003 * motionStrength);
     facetMaterial.opacity =
-      0.17 +
-      (reducedMotion ? 0 : Math.sin(motionTime * 0.42) * 0.035);
+      0.31 +
+      (reducedMotion ? 0 : Math.sin(motionTime * 0.42) * 0.045);
     monolithMaterial.clearcoat =
       monolithClearcoat +
       (reducedMotion ? 0 : Math.sin(motionTime * 0.18) * 0.035);
     monolithMaterial.emissiveIntensity =
-      0.2 +
-      (reducedMotion ? 0 : Math.sin(motionTime * 0.29 + 1.1) * 0.035);
+      0.3 +
+      (reducedMotion ? 0 : Math.sin(motionTime * 0.29 + 1.1) * 0.055);
     shellMaterial.uniforms.uTime.value = motionTime;
     shellMaterial.uniforms.uPointer.value.set(
       activePointerX,
@@ -885,14 +1126,48 @@ if (runtime) {
       : Math.cos(motionTime * 0.065) * 0.018;
     tendrilGroup.children.forEach((tendril) => {
       tendril.material.opacity =
-        0.105 +
+        0.145 +
         (reducedMotion
           ? 0
-          : Math.sin(motionTime * 0.23 + tendril.userData.phase) * 0.025);
+          : Math.sin(motionTime * 0.23 + tendril.userData.phase) * 0.04);
     });
+    spectralCrown.rotation.x = reducedMotion
+      ? 0
+      : Math.sin(motionTime * 0.095) * 0.025 + activePointerY * 0.016;
+    spectralCrown.rotation.y = reducedMotion
+      ? 0
+      : Math.sin(motionTime * 0.08) * 0.07 + activePointerX * 0.04;
+    spectralCrown.rotation.z = reducedMotion ? 0 : motionTime * 0.018;
+    prismMaterial.emissiveIntensity =
+      0.34 +
+      (reducedMotion ? 0 : Math.sin(motionTime * 0.38) * 0.08);
+    arcGroup.rotation.x = reducedMotion ? 0 : activePointerY * 0.012;
+    arcGroup.rotation.y = reducedMotion ? 0 : activePointerX * 0.026;
+    spectralArcs.forEach((arc, index) => {
+      arc.rotation.z =
+        index * 1.13 -
+        1.8 +
+        (reducedMotion
+          ? 0
+          : motionTime * (index % 2 === 0 ? 0.018 : -0.014));
+      arc.material.opacity =
+        0.19 +
+        (index % 3) * 0.035 +
+        (reducedMotion
+          ? 0
+          : Math.sin(motionTime * 0.31 + arc.userData.phase) * 0.045);
+    });
+    causticMaterial.uniforms.uTime.value = motionTime;
+    causticMaterial.uniforms.uPointer.value.set(
+      activePointerX,
+      activePointerY
+    );
+    poolMaterial.emissiveIntensity =
+      0.32 +
+      (reducedMotion ? 0 : Math.sin(motionTime * 0.17 - 0.8) * 0.055);
     underLight.intensity =
-      34 +
-      (reducedMotion ? 0 : Math.sin(motionTime * 0.36) * 3.5);
+      58 +
+      (reducedMotion ? 0 : Math.sin(motionTime * 0.36) * 7.5);
     underLight.position.x = reducedMotion
       ? 0
       : Math.sin(motionTime * 0.16) * 0.35 + activePointerX * 0.2;
@@ -903,13 +1178,18 @@ if (runtime) {
       ? 7
       : 7 + Math.cos(motionTime * 0.09) * 0.42;
     rimLight.intensity =
-      170 +
-      (reducedMotion ? 0 : Math.sin(motionTime * 0.21 + 0.8) * 10);
+      230 +
+      (reducedMotion ? 0 : Math.sin(motionTime * 0.21 + 0.8) * 18);
+    emberLight.intensity =
+      42 +
+      (reducedMotion ? 0 : Math.sin(motionTime * 0.27 + 1.7) * 7);
+    emberLight.position.z =
+      0.4 + (reducedMotion ? 0 : Math.cos(motionTime * 0.12) * 0.5);
     hemisphereLight.intensity =
-      0.58 +
+      0.72 +
       (reducedMotion ? 0 : Math.sin(motionTime * 0.14) * 0.025);
     terrainMaterial.emissiveIntensity =
-      0.12 +
+      0.2 +
       (reducedMotion ? 0 : Math.sin(motionTime * 0.16 - 0.6) * 0.018);
     rootsMaterial.opacity =
       0.48 +
@@ -918,11 +1198,11 @@ if (runtime) {
       ? 0
       : Math.sin(motionTime * 0.055) * 0.012;
     ringMaterial.emissiveIntensity =
-      0.58 +
-      (reducedMotion ? 0 : Math.sin(motionTime * 0.25 + 0.9) * 0.09);
+      0.88 +
+      (reducedMotion ? 0 : Math.sin(motionTime * 0.25 + 0.9) * 0.14);
     crownMaterial.emissiveIntensity =
-      0.04 +
-      (reducedMotion ? 0 : Math.sin(motionTime * 0.31 + 2.1) * 0.025);
+      0.16 +
+      (reducedMotion ? 0 : Math.sin(motionTime * 0.31 + 2.1) * 0.045);
 
     orbitalRings.forEach((ring, index) => {
       const ringMotion = reducedMotion

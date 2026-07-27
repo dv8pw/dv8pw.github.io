@@ -13,8 +13,9 @@ const runtime = createRuntime(canvas, {
 if (runtime) {
   const { renderer, pointer, prefersReducedMotion } = runtime;
   const identity = document.querySelector(".identity");
+  renderer.toneMappingExposure = 1.12;
   const scene = new THREE.Scene();
-  scene.fog = new THREE.FogExp2(0x020609, 0.045);
+  scene.fog = new THREE.FogExp2(0x010509, 0.039);
 
   const camera = new THREE.PerspectiveCamera(
     38,
@@ -46,33 +47,33 @@ if (runtime) {
 
   const brass = registerMaterial(
     new THREE.LineBasicMaterial({
-      color: 0xc7ad72,
+      color: 0xf0b85c,
       transparent: true,
-      opacity: 0.5,
+      opacity: 0.62,
       depthWrite: false
     })
   );
   const brassFaint = registerMaterial(
     new THREE.LineBasicMaterial({
-      color: 0xa79467,
+      color: 0xb97542,
       transparent: true,
-      opacity: 0.22,
+      opacity: 0.28,
       depthWrite: false
     })
   );
   const cold = registerMaterial(
     new THREE.LineBasicMaterial({
-      color: 0x93c8c7,
+      color: 0x66e5df,
       transparent: true,
-      opacity: 0.34,
+      opacity: 0.46,
       depthWrite: false
     })
   );
   const coldFaint = registerMaterial(
     new THREE.LineBasicMaterial({
-      color: 0x6c9698,
+      color: 0x358f9a,
       transparent: true,
-      opacity: 0.15,
+      opacity: 0.19,
       depthWrite: false
     })
   );
@@ -209,7 +210,7 @@ if (runtime) {
   const sweepStart = 2.74;
   const sweepLength = 3.05;
   const sweepSegments = 22;
-  const sweepColor = new THREE.Color(0x90ceca);
+  const sweepColor = new THREE.Color(0x73f5ed);
   for (let index = 0; index < sweepSegments; index += 1) {
     const from = sweepStart + (index / sweepSegments) * sweepLength;
     const to = sweepStart + ((index + 0.72) / sweepSegments) * sweepLength;
@@ -322,7 +323,7 @@ if (runtime) {
             * rayReach;
 
           float pointerAzimuth = uPointer.x * 0.15 - uPointer.y * 0.08;
-          float directional = 0.3 + 0.7 * pow(
+          float directional = 0.4 + 0.6 * pow(
             max(0.0, cos(angle - 0.64 + pointerAzimuth)),
             5.0
           );
@@ -335,19 +336,19 @@ if (runtime) {
           float outerFade = 1.0 - smoothstep(0.39, 0.495, radius);
           float radialEnvelope = innerFade * outerFade;
           float alpha = (
-            ring * 0.72
+            ring * 0.94
             + innerEdge
-            + outerBloom
-            + rays * 0.34
-            + sweep * (0.08 + uSignal * 0.12)
+            + outerBloom * 1.15
+            + rays * 0.52
+            + sweep * (0.1 + uSignal * 0.15)
           ) * directional * pulse * radialEnvelope;
 
-          vec3 cool = vec3(0.34, 0.72, 0.72);
-          vec3 warm = vec3(0.94, 0.66, 0.28);
+          vec3 cool = vec3(0.18, 0.92, 0.95);
+          vec3 warm = vec3(1.0, 0.48, 0.12);
           float warmth = smoothstep(-0.4, 0.85, cos(angle - 0.55));
           warmth += sweep * 0.18;
           vec3 color = mix(cool, warm, clamp(warmth, 0.0, 1.0));
-          color *= 1.02 + ring * 0.82 + rays * 0.28;
+          color *= 1.14 + ring * 1.04 + rays * 0.34;
           gl_FragColor = vec4(color, alpha);
         }
       `,
@@ -367,6 +368,98 @@ if (runtime) {
   halo.position.z = -0.42;
   scene.add(halo);
 
+  const energyDiscMaterial = registerMaterial(
+    new THREE.ShaderMaterial({
+      uniforms: {
+        uTime: { value: 0 }
+      },
+      vertexShader: `
+        precision mediump float;
+
+        uniform float uTime;
+        varying vec2 vUv;
+
+        void main() {
+          vUv = uv;
+          vec3 transformed = position;
+          float angle = atan(position.y, position.x);
+          transformed.z +=
+            sin(angle * 3.0 + uTime * 0.055) * 0.035
+            + sin(angle * 7.0 - uTime * 0.034) * 0.012;
+          gl_Position =
+            projectionMatrix
+            * modelViewMatrix
+            * vec4(transformed, 1.0);
+        }
+      `,
+      fragmentShader: `
+        precision mediump float;
+
+        uniform float uTime;
+        varying vec2 vUv;
+
+        void main() {
+          vec2 p = vUv - 0.5;
+          float radius = length(p);
+          float angle = atan(p.y, p.x);
+          float envelope =
+            smoothstep(0.315, 0.338, radius)
+            * (1.0 - smoothstep(0.455, 0.499, radius));
+          float lane = pow(
+            0.5
+            + 0.5 * sin((radius - 0.315) * 118.0 + angle * 2.0 - uTime * 0.58),
+            2.0
+          );
+          float streak = pow(
+            0.5
+            + 0.5 * sin(angle * 23.0 + radius * 91.0 - uTime * 0.46),
+            7.0
+          );
+          float counterStreak = pow(
+            0.5
+            + 0.5 * sin(angle * 37.0 - radius * 63.0 + uTime * 0.24),
+            10.0
+          );
+          float hotFront = pow(
+            max(0.0, cos(angle - uTime * 0.085 - 0.34)),
+            18.0
+          );
+          float warmth =
+            0.5
+            + 0.5 * cos(angle - uTime * 0.038 - radius * 8.0);
+          vec3 cool = vec3(0.05, 0.78, 0.9);
+          vec3 warm = vec3(1.0, 0.32, 0.055);
+          vec3 color = mix(cool, warm, warmth);
+          float intensity =
+            0.075
+            + lane * 0.14
+            + streak * 0.48
+            + counterStreak * 0.2
+            + hotFront * 0.74;
+          gl_FragColor = vec4(
+            color * (0.88 + streak * 0.62 + hotFront * 0.85),
+            intensity * envelope
+          );
+        }
+      `,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthTest: true,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      toneMapped: false
+    })
+  );
+  const energyDisc = new THREE.Mesh(
+    registerGeometry(
+      new THREE.RingGeometry(2.68, 4.25, isCompact ? 80 : 128, 3)
+    ),
+    energyDiscMaterial
+  );
+  energyDisc.position.z = -0.08;
+  energyDisc.rotation.set(1.12, 0.14, -0.28);
+  scene.add(energyDisc);
+
   const eclipse = new THREE.Mesh(
     registerGeometry(
       new THREE.SphereGeometry(
@@ -377,7 +470,7 @@ if (runtime) {
     ),
     registerMaterial(
       new THREE.MeshBasicMaterial({
-        color: 0x010304
+        color: 0x000102
       })
     )
   );
@@ -390,9 +483,9 @@ if (runtime) {
     ),
     registerMaterial(
       new THREE.MeshBasicMaterial({
-        color: 0x88b7b2,
+        color: 0x9bf9f2,
         transparent: true,
-        opacity: 0.16,
+        opacity: 0.25,
         side: THREE.DoubleSide,
         depthWrite: false
       })
@@ -401,6 +494,79 @@ if (runtime) {
   const rimMaterial = rim.material;
   rim.position.z = 0.1;
   scene.add(rim);
+
+  const photonMaterial = registerMaterial(
+    new THREE.ShaderMaterial({
+      uniforms: {
+        uTime: { value: 0 }
+      },
+      vertexShader: `
+        varying vec2 vUv;
+
+        void main() {
+          vUv = uv;
+          gl_Position =
+            projectionMatrix
+            * modelViewMatrix
+            * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        precision mediump float;
+
+        uniform float uTime;
+        varying vec2 vUv;
+
+        void main() {
+          vec2 p = vUv - 0.5;
+          float radius = length(p);
+          float angle = atan(p.y, p.x);
+          float radial = clamp((radius - 0.472) / 0.028, 0.0, 1.0);
+          float ribbon = sin(radial * 3.14159265);
+          float leading = pow(
+            max(0.0, cos(angle - uTime * 0.13 - 0.5)),
+            24.0
+          );
+          float trailing = pow(
+            max(0.0, cos(angle + uTime * 0.09 + 2.45)),
+            30.0
+          );
+          float filaments =
+            0.5
+            + 0.5 * sin(angle * 41.0 - uTime * 0.17);
+          vec3 cool = vec3(0.22, 0.98, 1.0);
+          vec3 warm = vec3(1.0, 0.55, 0.12);
+          vec3 color = mix(cool, warm, 0.24 + leading * 0.76);
+          float alpha =
+            ribbon
+            * (
+              0.18
+              + filaments * 0.12
+              + leading * 0.88
+              + trailing * 0.55
+            );
+          gl_FragColor = vec4(
+            color * (1.15 + leading * 0.95 + trailing * 0.45),
+            alpha
+          );
+        }
+      `,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthTest: true,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      toneMapped: false
+    })
+  );
+  const photonShell = new THREE.Mesh(
+    registerGeometry(
+      new THREE.RingGeometry(2.575, 2.73, isCompact ? 80 : 128, 2)
+    ),
+    photonMaterial
+  );
+  photonShell.position.z = 0.085;
+  scene.add(photonShell);
 
   const nodeGeometry = registerGeometry(new THREE.IcosahedronGeometry(0.055, 1));
   const nodeMaterial = registerMaterial(
@@ -457,13 +623,72 @@ if (runtime) {
     seed = (seed * 16807) % 2147483647;
     return (seed - 1) / 2147483646;
   };
-  const accretionCount = isCompact ? 58 : 110;
+
+  const shardCount = isCompact ? 16 : 30;
+  const shardGeometry = registerGeometry(
+    new THREE.BoxGeometry(0.026, 0.2, 0.026)
+  );
+  const shardMaterial = registerMaterial(
+    new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.84,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      toneMapped: false
+    })
+  );
+  const energyShards = new THREE.InstancedMesh(
+    shardGeometry,
+    shardMaterial,
+    shardCount
+  );
+  const shardDummy = new THREE.Object3D();
+  const shardColor = new THREE.Color();
+  const shardCool = new THREE.Color(0x55f8ef);
+  const shardWarm = new THREE.Color(0xff8a26);
+  for (let index = 0; index < shardCount; index += 1) {
+    const angle =
+      (index / shardCount) * Math.PI * 2
+      + (random() - 0.5) * 0.12;
+    const radius = 3.18 + random() * 1.48;
+    shardDummy.position.set(
+      Math.cos(angle) * radius,
+      Math.sin(angle) * radius,
+      (random() - 0.5) * 0.48
+    );
+    shardDummy.rotation.set(
+      (random() - 0.5) * 0.18,
+      (random() - 0.5) * 0.18,
+      angle + Math.PI * 0.5
+    );
+    shardDummy.scale.set(
+      0.7 + random() * 0.55,
+      0.45 + random() * 1.65,
+      0.7 + random() * 0.55
+    );
+    shardDummy.updateMatrix();
+    energyShards.setMatrixAt(index, shardDummy.matrix);
+    shardColor.copy(shardCool).lerp(shardWarm, random());
+    energyShards.setColorAt(index, shardColor);
+  }
+  energyShards.instanceMatrix.needsUpdate = true;
+  if (energyShards.instanceColor) {
+    energyShards.instanceColor.needsUpdate = true;
+  }
+  const energyShardShell = new THREE.Group();
+  energyShardShell.rotation.set(0.73, -0.08, 0.31);
+  energyShardShell.add(energyShards);
+  scene.add(energyShardShell);
+
+  const accretionCount = isCompact ? 42 : 84;
   const accretionPositions = new Float32Array(accretionCount * 3);
   const accretionColors = new Float32Array(accretionCount * 3);
   const accretionPhases = new Float32Array(accretionCount);
   const accretionSizes = new Float32Array(accretionCount);
-  const accretionCool = new THREE.Color(0x68a8aa);
-  const accretionWarm = new THREE.Color(0xd5b46c);
+  const accretionCool = new THREE.Color(0x4ce6e1);
+  const accretionWarm = new THREE.Color(0xf58d35);
   const accretionColor = new THREE.Color();
 
   for (let index = 0; index < accretionCount; index += 1) {
@@ -538,8 +763,8 @@ if (runtime) {
           float body = 1.0 - smoothstep(0.12, 0.5, radius);
           float core = 1.0 - smoothstep(0.0, 0.12, radius);
           gl_FragColor = vec4(
-            vColor * (0.76 + core * 0.55),
-            body * vPulse * 0.7
+            vColor * (0.88 + core * 0.72),
+            body * vPulse * 0.78
           );
         }
       `,
@@ -760,6 +985,32 @@ if (runtime) {
       inputY * -0.035 * compactMotion,
       -0.42
     );
+    energyDisc.position.set(
+      inputX * 0.018 * compactMotion,
+      inputY * 0.014 * compactMotion,
+      -0.08
+    );
+    energyDisc.rotation.set(
+      1.12 + inputY * 0.032 * compactMotion,
+      0.14 + inputX * 0.038 * compactMotion,
+      reduced ? -0.28 : -0.28 + time * 0.006
+    );
+    energyDiscMaterial.uniforms.uTime.value = time;
+    photonShell.rotation.z = reduced ? 0.32 : 0.32 - time * 0.018;
+    photonMaterial.uniforms.uTime.value = time;
+    energyShardShell.position.set(
+      inputX * -0.018 * compactMotion,
+      inputY * -0.014 * compactMotion,
+      0
+    );
+    energyShardShell.rotation.set(
+      0.73 + inputY * 0.022 * compactMotion,
+      -0.08 + inputX * 0.03 * compactMotion,
+      reduced ? 0.31 : 0.31 - time * 0.019
+    );
+    energyShardShell.scale.setScalar(
+      reduced ? 1 : 1 + Math.sin(time * 0.21) * 0.006
+    );
     accretionField.position.set(
       inputX * -0.024 * compactMotion,
       inputY * -0.018 * compactMotion,
@@ -794,8 +1045,8 @@ if (runtime) {
       reduced ? 1 : 0.82 + Math.sin(time * 1.7) * 0.18
     );
     rimMaterial.opacity = reduced
-      ? 0.16
-      : 0.145 + Math.sin(time * 0.51) * 0.018;
+      ? 0.25
+      : 0.23 + Math.sin(time * 0.51) * 0.025;
     sweepMaterial.opacity = reduced
       ? 0.58
       : 0.54 + Math.sin(time * 0.37) * 0.06;

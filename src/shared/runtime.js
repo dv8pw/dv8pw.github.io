@@ -11,7 +11,8 @@ export function createRuntime(canvas, options = {}) {
     antialias = true,
     alpha = false,
     clearColor = 0x050506,
-    maxPixelRatio = 1.75
+    maxPixelRatio = 1.75,
+    pointerFrequency = 16
   } = options;
 
   let renderer;
@@ -37,20 +38,19 @@ export function createRuntime(canvas, options = {}) {
 
   const pointer = new THREE.Vector2();
   const pointerTarget = new THREE.Vector2();
+  const pointerVelocity = new THREE.Vector2();
   const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   const timer = new THREE.Timer();
 
   const updatePointer = (clientX, clientY) => {
     pointerTarget.set(
-      (clientX / window.innerWidth) * 2 - 1,
-      1 - (clientY / window.innerHeight) * 2
+      sCurve((clientX / window.innerWidth) * 2 - 1),
+      sCurve(1 - (clientY / window.innerHeight) * 2)
     );
-    pointer.set(sCurve(pointerTarget.x), sCurve(pointerTarget.y));
   };
 
   const onPointerMove = (event) => updatePointer(event.clientX, event.clientY);
   const onPointerLeave = () => {
-    pointer.set(0, 0);
     pointerTarget.set(0, 0);
   };
   const onResize = () => {
@@ -62,16 +62,43 @@ export function createRuntime(canvas, options = {}) {
   document.documentElement.addEventListener("pointerleave", onPointerLeave);
   window.addEventListener("resize", onResize, { passive: true });
 
+  const stepPointerAxis = (axis, delta) => {
+    const error = pointer[axis] - pointerTarget[axis];
+    const criticallyDampedVelocity =
+      pointerVelocity[axis] + pointerFrequency * error;
+    const decay = Math.exp(-pointerFrequency * delta);
+
+    pointer[axis] =
+      pointerTarget[axis] +
+      (error + criticallyDampedVelocity * delta) * decay;
+    pointerVelocity[axis] =
+      (pointerVelocity[axis] -
+        pointerFrequency * criticallyDampedVelocity * delta) *
+      decay;
+
+    if (
+      Math.abs(pointer[axis] - pointerTarget[axis]) < 0.00001 &&
+      Math.abs(pointerVelocity[axis]) < 0.00001
+    ) {
+      pointer[axis] = pointerTarget[axis];
+      pointerVelocity[axis] = 0;
+    }
+  };
+
   return {
     renderer,
     pointer,
     pointerTarget,
+    pointerVelocity,
     timer,
     prefersReducedMotion,
     tick() {
       timer.update();
+      const delta = Math.min(timer.getDelta(), 0.05);
+      stepPointerAxis("x", delta);
+      stepPointerAxis("y", delta);
       return {
-        delta: Math.min(timer.getDelta(), 0.05),
+        delta,
         elapsed: timer.getElapsed()
       };
     },

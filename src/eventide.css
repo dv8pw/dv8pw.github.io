@@ -1,24 +1,45 @@
 @import "./shared/base.css";
 
 :root {
-  --background: #020609;
+  --background: #010408;
   --fallback:
-    radial-gradient(circle at 50% 47%, #26343a 0 8%, #11191e 24%, #050a0d 55%, #020406 100%);
-  --title-color: rgb(244 236 214 / 0.96);
-  --motto-color: rgb(190 212 211 / 0.7);
+    radial-gradient(circle at 50% 48%, #22404a 0 7%, #101e25 22%, #04090e 54%, #010307 100%);
+  --title-color: rgb(255 244 218 / 0.98);
+  --motto-color: rgb(184 235 231 / 0.82);
   --title-font: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
   --title-weight: 400;
   --title-spacing: 0.125em;
 }
 
 .experience {
-  background-color: #020609;
+  background-color: #010408;
 }
 
 .experience::before {
   background:
-    linear-gradient(90deg, rgb(0 0 0 / 0.52), transparent 18% 82%, rgb(0 0 0 / 0.52)),
-    radial-gradient(circle at 50% 48%, transparent 0 25%, rgb(0 3 5 / 0.08) 44%, rgb(0 2 4 / 0.76) 100%);
+    linear-gradient(
+      90deg,
+      rgb(0 0 0 / 0.62),
+      transparent 20% 80%,
+      rgb(0 0 0 / 0.62)
+    ),
+    radial-gradient(
+      circle at 50% 49%,
+      transparent 0 24%,
+      rgb(21 138 145 / 0.055) 34%,
+      transparent 54%
+    ),
+    radial-gradient(
+      circle at 67% 42%,
+      rgb(175 61 17 / 0.07),
+      transparent 31%
+    ),
+    radial-gradient(
+      circle at 50% 48%,
+      transparent 0 28%,
+      rgb(0 3 6 / 0.12) 46%,
+      rgb(0 1 4 / 0.82) 100%
+    );
 }
 
 .experience::after {
@@ -41,16 +62,18 @@
   width: clamp(1.5rem, 8vw, 8rem);
   height: 1px;
   content: "";
-  opacity: 0.48;
+  opacity: 0.68;
   background:
     linear-gradient(
       90deg,
       transparent 0 32%,
-      rgb(200 182 133 / 0.22) 50%,
-      #c8b685 100%
+      rgb(95 224 218 / 0.28) 50%,
+      #efb75f 100%
     );
   background-size: 180% 100%;
-  box-shadow: 0 0 16px rgb(178 209 205 / 0.18);
+  box-shadow:
+    0 0 12px rgb(74 232 225 / 0.22),
+    0 0 24px rgb(236 139 57 / 0.08);
 }
 
 .identity::before {
@@ -67,9 +90,10 @@
   font-size: clamp(3.35rem, 12.8vw, 12.8rem);
   line-height: 0.76;
   text-shadow:
-    0 1px 0 rgb(255 255 255 / 0.28),
-    0 0 18px rgb(3 8 10 / 0.88),
-    0 0 62px rgb(3 8 10 / 0.9);
+    0 1px 0 rgb(255 255 255 / 0.34),
+    0 0 9px rgb(0 2 5 / 0.98),
+    0 0 28px rgb(0 2 5 / 0.95),
+    0 0 78px rgb(0 1 4 / 0.96);
 }
 
 .motto {
@@ -79,7 +103,9 @@
   font-size: clamp(0.58rem, 0.64vw, 0.72rem);
   font-weight: 400;
   letter-spacing: 0.43em;
-  text-shadow: 0 0 18px rgb(0 0 0 / 0.9);
+  text-shadow:
+    0 0 8px rgb(0 0 0 / 0.96),
+    0 0 22px rgb(0 0 0 / 0.94);
 }
 
 @media (max-width: 700px) {

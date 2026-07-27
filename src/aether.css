@@ -57,7 +57,7 @@
 
 .experience::after {
   opacity: 0.085;
-  animation: aether-grain-drift 28s steps(3, end) infinite;
+  animation: aether-grain-drift 84s steps(3, end) infinite;
 }
 
 @keyframes aether-sheen {
