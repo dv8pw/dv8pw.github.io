@@ -1,0 +1,49 @@
+@import "./shared/base.css";
+
+:root {
+  --background: #07070a;
+  --fallback:
+    radial-gradient(circle at 52% 42%, #493a52 0, #17121f 28%, #08080c 72%);
+  --title-color: rgb(244 239 224 / 0.9);
+  --motto-color: rgb(236 227 208 / 0.6);
+  --title-font: "Helvetica Neue", "Nimbus Sans L", Arial, sans-serif;
+  --title-weight: 300;
+  --title-spacing: 0.16em;
+}
+
+.identity {
+  mix-blend-mode: screen;
+}
+
+.title {
+  padding-left: 0.16em;
+  font-size: clamp(3.25rem, 12.5vw, 12rem);
+  line-height: 0.75;
+  text-shadow:
+    0 0 0.8px rgb(255 255 255 / 0.9),
+    0 0 50px rgb(205 184 225 / 0.08);
+}
+
+.motto {
+  margin-top: clamp(1.5rem, 3vw, 2.8rem);
+}
+
+.experience::before {
+  background:
+    radial-gradient(circle at center, transparent 0 20%, rgb(5 5 8 / 0.08) 50%, rgb(3 3 5 / 0.66) 100%),
+    linear-gradient(90deg, rgb(0 0 0 / 0.24), transparent 20% 80%, rgb(0 0 0 / 0.24));
+}
+
+.experience::after {
+  opacity: 0.085;
+}
+
+@media (max-width: 600px) {
+  :root {
+    --title-spacing: 0.1em;
+  }
+
+  .title {
+    padding-left: 0.1em;
+  }
+}

@@ -1,0 +1,154 @@
+:root {
+  --background: #080b08;
+  --fallback:
+    radial-gradient(circle at 50% 44%, rgb(63 75 44 / 0.5), transparent 24%),
+    radial-gradient(ellipse at 50% 102%, #29301d, transparent 56%),
+    #080b08;
+  --title-color: #e9e6d4;
+  --motto-color: rgb(223 225 195 / 0.68);
+  --title-font:
+    "Iowan Old Style", "Baskerville", "Times New Roman", Times, serif;
+  --title-weight: 400;
+  --title-spacing: 0.025em;
+}
+
+.experience::before {
+  z-index: 1;
+  background:
+    radial-gradient(
+      ellipse at 50% 50%,
+      rgb(3 7 4 / 0.08) 0 18%,
+      rgb(3 6 3 / 0.18) 43%,
+      rgb(1 3 2 / 0.76) 112%
+    ),
+    linear-gradient(
+      180deg,
+      rgb(0 0 0 / 0.28),
+      transparent 24% 72%,
+      rgb(0 0 0 / 0.56)
+    );
+}
+
+.experience::after {
+  opacity: 0.09;
+  mix-blend-mode: overlay;
+}
+
+.identity {
+  top: 49%;
+  width: min(92vw, 76rem);
+  filter: drop-shadow(0 3px 18px rgb(0 0 0 / 0.72));
+}
+
+.identity::before {
+  position: absolute;
+  z-index: -1;
+  inset: 50% 8%;
+  height: 13rem;
+  content: "";
+  background: radial-gradient(
+    ellipse,
+    rgb(5 8 5 / 0.56),
+    rgb(5 8 5 / 0.2) 44%,
+    transparent 72%
+  );
+  filter: blur(26px);
+  transform: translateY(-50%);
+}
+
+.title {
+  font-size: clamp(3.9rem, 11.8vw, 10.8rem);
+  font-variant-caps: small-caps;
+  line-height: 0.72;
+  text-shadow:
+    0 1px 0 rgb(255 255 255 / 0.13),
+    0 3px 12px rgb(0 0 0 / 0.72),
+    0 16px 55px rgb(0 0 0 / 0.42);
+}
+
+.title span {
+  display: block;
+}
+
+.title span:first-child {
+  margin-left: -0.08em;
+  font-size: 0.57em;
+  font-style: italic;
+  line-height: 0.86;
+  letter-spacing: 0.39em;
+}
+
+.title span:last-child {
+  letter-spacing: 0.015em;
+}
+
+.motto {
+  display: inline-flex;
+  align-items: center;
+  gap: clamp(0.75rem, 1.8vw, 1.6rem);
+  margin-top: clamp(1.5rem, 3vw, 2.5rem);
+  font-family:
+    ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: clamp(0.58rem, 0.72vw, 0.72rem);
+  font-weight: 500;
+  letter-spacing: 0.36em;
+}
+
+.motto::before,
+.motto::after {
+  width: clamp(1.8rem, 5vw, 4.8rem);
+  height: 1px;
+  content: "";
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgb(188 201 139 / 0.58)
+  );
+}
+
+.motto::after {
+  transform: scaleX(-1);
+}
+
+.webgl-unavailable .experience::before {
+  background:
+    radial-gradient(circle at 50% 42%, transparent 0 18%, rgb(0 0 0 / 0.25) 58%, rgb(0 0 0 / 0.75)),
+    repeating-radial-gradient(
+      ellipse at 50% 75%,
+      transparent 0 2rem,
+      rgb(159 172 112 / 0.07) 2.08rem 2.14rem
+    );
+}
+
+@media (max-width: 600px) {
+  .identity {
+    top: 48%;
+  }
+
+  .title {
+    font-size: clamp(3.45rem, 20vw, 6.6rem);
+    line-height: 0.76;
+  }
+
+  .title span:first-child {
+    margin-bottom: 0.12em;
+    font-size: 0.52em;
+    letter-spacing: 0.3em;
+  }
+
+  .motto {
+    gap: 0.7rem;
+    letter-spacing: 0.27em;
+  }
+
+  .motto::before,
+  .motto::after {
+    width: 1.4rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .identity {
+    filter: drop-shadow(0 3px 14px rgb(0 0 0 / 0.78));
+  }
+}

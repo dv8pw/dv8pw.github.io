@@ -1,0 +1,115 @@
+@import "./shared/base.css";
+
+:root {
+  --background: #020609;
+  --fallback:
+    radial-gradient(circle at 50% 47%, #26343a 0 8%, #11191e 24%, #050a0d 55%, #020406 100%);
+  --title-color: rgb(244 236 214 / 0.96);
+  --motto-color: rgb(190 212 211 / 0.7);
+  --title-font: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
+  --title-weight: 400;
+  --title-spacing: 0.125em;
+}
+
+.experience {
+  background-color: #020609;
+}
+
+.experience::before {
+  background:
+    linear-gradient(90deg, rgb(0 0 0 / 0.52), transparent 18% 82%, rgb(0 0 0 / 0.52)),
+    radial-gradient(circle at 50% 48%, transparent 0 25%, rgb(0 3 5 / 0.08) 44%, rgb(0 2 4 / 0.76) 100%);
+}
+
+.experience::after {
+  opacity: 0.055;
+  mix-blend-mode: screen;
+}
+
+.identity {
+  top: 50%;
+  width: min(94vw, 100rem);
+  transform: translate(-50%, -50.5%);
+}
+
+.identity::before,
+.identity::after {
+  position: absolute;
+  top: 50%;
+  width: clamp(1.5rem, 8vw, 8rem);
+  height: 1px;
+  content: "";
+  opacity: 0.48;
+  background: linear-gradient(90deg, transparent, #c8b685);
+  box-shadow: 0 0 16px rgb(178 209 205 / 0.18);
+}
+
+.identity::before {
+  right: calc(50% + min(32vw, 29rem));
+}
+
+.identity::after {
+  left: calc(50% + min(32vw, 29rem));
+  transform: rotate(180deg);
+}
+
+.title {
+  padding-left: 0.125em;
+  font-size: clamp(3.35rem, 12.8vw, 12.8rem);
+  line-height: 0.76;
+  text-shadow:
+    0 1px 0 rgb(255 255 255 / 0.28),
+    0 0 18px rgb(3 8 10 / 0.88),
+    0 0 62px rgb(3 8 10 / 0.9);
+}
+
+.motto {
+  margin-top: clamp(1.4rem, 2.8vw, 2.7rem);
+  color: var(--motto-color);
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: clamp(0.58rem, 0.64vw, 0.72rem);
+  font-weight: 400;
+  letter-spacing: 0.43em;
+  text-shadow: 0 0 18px rgb(0 0 0 / 0.9);
+}
+
+@media (max-width: 700px) {
+  :root {
+    --title-spacing: 0.075em;
+  }
+
+  .identity {
+    width: 96vw;
+  }
+
+  .identity::before,
+  .identity::after {
+    display: none;
+  }
+
+  .title {
+    padding-left: 0.075em;
+    font-size: clamp(3.2rem, 16.8vw, 7.2rem);
+  }
+
+  .motto {
+    margin-top: 1.25rem;
+    letter-spacing: 0.34em;
+  }
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+  .title {
+    font-size: clamp(3rem, 15vh, 6.4rem);
+  }
+
+  .motto {
+    margin-top: 0.9rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .identity {
+    transform: translate(-50%, -50%);
+  }
+}
