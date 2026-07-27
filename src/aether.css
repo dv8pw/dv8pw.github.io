@@ -12,20 +12,62 @@
 }
 
 .identity {
+  --aether-x: 0px;
+  --aether-y: 0px;
+  --aether-tilt-x: 0deg;
+  --aether-tilt-y: 0deg;
+  --aether-motto-x: 0px;
+  --aether-motto-y: 0px;
+  --aether-motion: 0;
+  --aether-glow: 50px;
+  --aether-glow-alpha: 0.08;
+
   mix-blend-mode: screen;
+  transform:
+    translate(
+      calc(-50% + var(--aether-x)),
+      calc(-50% + var(--aether-y))
+    )
+    perspective(900px)
+    rotateX(var(--aether-tilt-x))
+    rotateY(var(--aether-tilt-y));
+  transform-style: preserve-3d;
+  will-change: transform;
 }
 
 .title {
   padding-left: 0.16em;
+  color: transparent;
+  background:
+    linear-gradient(
+      112deg,
+      rgb(226 220 216 / 0.84) 0%,
+      rgb(255 248 229 / 0.98) 38%,
+      rgb(218 207 224 / 0.88) 52%,
+      rgb(255 245 226 / 0.96) 66%,
+      rgb(220 214 216 / 0.84) 100%
+    )
+    0% 50% / 220% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
   font-size: clamp(3.25rem, 12.5vw, 12rem);
   line-height: 0.75;
   text-shadow:
     0 0 0.8px rgb(255 255 255 / 0.9),
-    0 0 50px rgb(205 184 225 / 0.08);
+    0 0 var(--aether-glow)
+      rgb(205 184 225 / var(--aether-glow-alpha));
+  transform: translateZ(18px);
+  animation: aether-sheen 13s ease-in-out infinite alternate;
 }
 
 .motto {
   margin-top: clamp(1.5rem, 3vw, 2.8rem);
+  transform: translate3d(
+    var(--aether-motto-x),
+    var(--aether-motto-y),
+    6px
+  );
+  transition: opacity 600ms ease;
 }
 
 .experience::before {
@@ -36,6 +78,35 @@
 
 .experience::after {
   opacity: 0.085;
+  animation: aether-grain-drift 28s steps(3, end) infinite;
+}
+
+@keyframes aether-sheen {
+  0% {
+    background-position: 12% 50%;
+  }
+
+  100% {
+    background-position: 88% 50%;
+  }
+}
+
+@keyframes aether-grain-drift {
+  0% {
+    transform: translate3d(-1%, -1%, 0) rotate(7deg);
+  }
+
+  33% {
+    transform: translate3d(1%, -0.5%, 0) rotate(7.2deg);
+  }
+
+  66% {
+    transform: translate3d(-0.5%, 1%, 0) rotate(6.8deg);
+  }
+
+  100% {
+    transform: translate3d(-1%, -1%, 0) rotate(7deg);
+  }
 }
 
 @media (max-width: 600px) {
@@ -45,5 +116,25 @@
 
   .title {
     padding-left: 0.1em;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .identity {
+    transform: translate(-50%, -50%);
+  }
+
+  .title {
+    background-position: 50% 50%;
+    animation: none;
+  }
+
+  .motto {
+    transform: none;
+    transition: none;
+  }
+
+  .experience::after {
+    animation: none;
   }
 }

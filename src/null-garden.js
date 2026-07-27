@@ -4,6 +4,9 @@ import "./shared/base.css";
 import "./null-garden.css";
 
 const canvas = document.querySelector(".webgl");
+const identity = document.querySelector(".identity");
+const titleLayers = document.querySelectorAll(".title span");
+const motto = document.querySelector(".motto");
 const runtime = canvas
   ? createRuntime(canvas, {
       antialias: true,
@@ -17,6 +20,7 @@ if (runtime) {
   const isCompact =
     window.matchMedia("(max-width: 720px), (pointer: coarse)").matches ||
     (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4);
+  const motionStrength = isCompact ? 0.58 : 1;
 
   renderer.toneMappingExposure = 0.92;
   renderer.shadowMap.enabled = !isCompact;
@@ -39,6 +43,7 @@ if (runtime) {
   const garden = new THREE.Group();
   garden.position.z = -1;
   scene.add(garden);
+  const orbitalRings = [];
 
   const fract = (value) => value - Math.floor(value);
   const hash = (x, y) =>
@@ -106,12 +111,23 @@ if (runtime) {
 
       void main() {
         float horizon = smoothstep(-0.22, 0.66, vDirection.y);
+        vec2 drift = vec2(uTime * 0.0022, -uTime * 0.0011);
         float glow = pow(max(0.0, 1.0 - length(vDirection.xy - vec2(uPointer.x * 0.035, -0.05))), 4.0);
+        float veilNoise = random(floor((vDirection.xz + drift) * 34.0));
+        float veil = sin(
+          vDirection.x * 10.0 +
+          vDirection.y * 5.0 +
+          veilNoise * 2.6 +
+          uTime * 0.028
+        ) * 0.5 + 0.5;
+        veil *= smoothstep(-0.34, 0.05, vDirection.y) *
+          (1.0 - smoothstep(0.20, 0.66, vDirection.y));
         float grain = random(floor((vDirection.xy + uTime * 0.0008) * 240.0));
         vec3 earth = vec3(0.046, 0.052, 0.036);
         vec3 voidColor = vec3(0.010, 0.016, 0.014);
         vec3 color = mix(earth, voidColor, horizon);
         color += vec3(0.070, 0.088, 0.050) * glow;
+        color += vec3(0.025, 0.034, 0.017) * veil;
         color += (grain - 0.5) * 0.008;
         gl_FragColor = vec4(color, 1.0);
       }
@@ -164,6 +180,8 @@ if (runtime) {
     vertexColors: true,
     roughness: 0.94,
     metalness: 0.03,
+    emissive: 0x11160c,
+    emissiveIntensity: 0.12,
     flatShading: true
   });
   const terrain = new THREE.Mesh(terrainGeometry, terrainMaterial);
@@ -265,11 +283,22 @@ if (runtime) {
   );
   monolithGeometry.computeVertexNormals();
 
-  const monolithMaterial = new THREE.MeshStandardMaterial({
+  const monolithClearcoat = isCompact ? 0.2 : 0.34;
+  const monolithMaterial = new THREE.MeshPhysicalMaterial({
     color: 0x849080,
     vertexColors: true,
-    roughness: 0.32,
-    metalness: 0.46,
+    roughness: 0.29,
+    metalness: 0.5,
+    clearcoat: monolithClearcoat,
+    clearcoatRoughness: 0.3,
+    iridescence: isCompact ? 0 : 0.16,
+    iridescenceIOR: 1.36,
+    iridescenceThicknessRange: [120, 310],
+    sheen: isCompact ? 0 : 0.13,
+    sheenColor: 0x718069,
+    sheenRoughness: 0.68,
+    emissive: 0x090e08,
+    emissiveIntensity: 0.2,
     flatShading: true
   });
   const monolith = new THREE.Mesh(monolithGeometry, monolithMaterial);
@@ -293,6 +322,86 @@ if (runtime) {
   facets.renderOrder = 2;
   monolith.add(facets);
   disposables.push(facetGeometry, facetMaterial);
+
+  const auraGeometry = new THREE.PlaneGeometry(11.5, 12.5);
+  const auraCurrentExpression = isCompact
+    ? `0.5 + 0.5 * sin(
+        p.x * 9.0 +
+        p.y * 7.0 +
+        uTime * 0.04 +
+        sin(p.y * 11.0 - uTime * 0.02)
+      )`
+    : `noise(
+        p * 4.2 +
+        vec2(cos(angle), sin(angle)) * 0.35 +
+        vec2(uTime * 0.012, -uTime * 0.008)
+      )`;
+  const auraMaterial = new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    uniforms: {
+      uTime: { value: 0 },
+      uPointer: { value: new THREE.Vector2() }
+    },
+    vertexShader: `
+      varying vec2 vUv;
+
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      varying vec2 vUv;
+      uniform float uTime;
+      uniform vec2 uPointer;
+
+      float random(vec2 p) {
+        return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+      }
+
+      float noise(vec2 p) {
+        vec2 i = floor(p);
+        vec2 f = fract(p);
+        f = f * f * (3.0 - 2.0 * f);
+        float a = random(i);
+        float b = random(i + vec2(1.0, 0.0));
+        float c = random(i + vec2(0.0, 1.0));
+        float d = random(i + vec2(1.0, 1.0));
+        return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+      }
+
+      void main() {
+        vec2 p = vUv - 0.5;
+        p.x *= 0.88;
+        p -= uPointer * vec2(0.008, 0.005);
+        float radius = length(p);
+        float angle = atan(p.y, p.x);
+        float current = ${auraCurrentExpression};
+        float breath = 0.5 + 0.5 * sin(uTime * 0.18 + current * 4.0);
+        float body = smoothstep(0.53, 0.08, radius);
+        float hollow = smoothstep(0.04, 0.22, radius);
+        float outerRing = smoothstep(0.46, 0.27, radius) *
+          smoothstep(0.13, 0.3, radius);
+        float alpha = body * hollow * (0.012 + current * 0.026);
+        alpha += outerRing * (0.007 + breath * 0.009);
+        vec3 color = mix(
+          vec3(0.18, 0.23, 0.11),
+          vec3(0.38, 0.43, 0.25),
+          current
+        );
+        gl_FragColor = vec4(color, alpha);
+      }
+    `
+  });
+  const aura = new THREE.Mesh(auraGeometry, auraMaterial);
+  aura.position.set(0, 2.45, -3.72);
+  aura.quaternion.copy(camera.quaternion);
+  aura.renderOrder = -1;
+  scene.add(aura);
+  animatedMaterials.push(auraMaterial);
+  disposables.push(auraGeometry, auraMaterial);
 
   const ringMaterial = new THREE.MeshStandardMaterial({
     color: 0x313824,
@@ -319,6 +428,10 @@ if (runtime) {
       -2
     );
     mesh.scale.z = 0.78;
+    mesh.userData.baseY = mesh.position.y;
+    mesh.userData.phase = ring * 1.37;
+    mesh.userData.baseScale = 1 + ring * 0.008;
+    orbitalRings.push(mesh);
     garden.add(mesh);
     disposables.push(geometry);
   }
@@ -342,14 +455,31 @@ if (runtime) {
 
   stalkMaterial.onBeforeCompile = (shader) => {
     shader.uniforms.uTime = { value: 0 };
-    shader.vertexShader = `uniform float uTime;\n${shader.vertexShader}`;
+    shader.uniforms.uPointer = { value: new THREE.Vector2() };
+    shader.vertexShader =
+      `uniform float uTime;\nuniform vec2 uPointer;\n${shader.vertexShader}`;
     shader.vertexShader = shader.vertexShader.replace(
       "#include <begin_vertex>",
       `
         #include <begin_vertex>
-        float sway = sin(uTime * 0.42 + position.y * 2.8) * position.y;
-        transformed.x += sway * 0.022;
-        transformed.z += cos(uTime * 0.31 + position.y * 2.1) * position.y * 0.015;
+        vec3 instanceOffset = vec3(0.0);
+        #ifdef USE_INSTANCING
+          instanceOffset = instanceMatrix[3].xyz;
+        #endif
+        float phase = dot(instanceOffset.xz, vec2(0.73, 0.41));
+        float slowCurrent = sin(uTime * 0.19 + phase * 0.37) * 0.5 + 0.5;
+        float sway = sin(
+          uTime * (0.34 + slowCurrent * 0.08) +
+          phase +
+          position.y * 2.8
+        ) * position.y;
+        transformed.x += sway * (0.014 + slowCurrent * 0.012);
+        transformed.x += uPointer.x * position.y * 0.007;
+        transformed.z += cos(
+          uTime * 0.27 +
+          phase * 1.31 +
+          position.y * 2.1
+        ) * position.y * 0.016;
       `
     );
     stalkMaterial.userData.shader = shader;
@@ -405,6 +535,8 @@ if (runtime) {
   const crownGeometry = new THREE.OctahedronGeometry(0.14, 0);
   const crownMaterial = new THREE.MeshStandardMaterial({
     color: 0x9b9b67,
+    emissive: 0x11150a,
+    emissiveIntensity: 0.04,
     roughness: 0.38,
     metalness: 0.48,
     flatShading: true
@@ -470,30 +602,40 @@ if (runtime) {
     blending: THREE.AdditiveBlending,
     uniforms: {
       uTime: { value: 0 },
-      uPixelRatio: { value: renderer.getPixelRatio() }
+      uPixelRatio: { value: renderer.getPixelRatio() },
+      uPointer: { value: new THREE.Vector2() }
     },
     vertexShader: `
       attribute float aSize;
       uniform float uTime;
       uniform float uPixelRatio;
+      uniform vec2 uPointer;
       varying float vFade;
+      varying float vShimmer;
 
       void main() {
         vec3 p = position;
-        p.x += sin(uTime * 0.14 + position.y * 1.7) * 0.12;
-        p.y += sin(uTime * 0.19 + position.x * 0.8) * 0.09;
+        float seed = fract(sin(dot(position.xz, vec2(12.9898, 78.233))) * 43758.5453);
+        float current = sin(uTime * 0.11 + position.y * 0.82 + seed * 6.2831);
+        p.x += current * (0.08 + seed * 0.11);
+        p.x += uPointer.x * (0.025 + seed * 0.025);
+        p.y += sin(uTime * (0.13 + seed * 0.08) + position.x * 0.54) * 0.12;
+        p.z += cos(uTime * 0.09 + position.x * 0.31 + seed * 4.0) * 0.08;
         vec4 mvPosition = modelViewMatrix * vec4(p, 1.0);
         gl_PointSize = aSize * uPixelRatio * (45.0 / max(1.0, -mvPosition.z));
         gl_Position = projectionMatrix * mvPosition;
         vFade = 1.0 - smoothstep(4.0, 30.0, -mvPosition.z);
+        vShimmer = 0.68 + 0.32 * sin(uTime * 0.43 + seed * 12.0);
       }
     `,
     fragmentShader: `
       varying float vFade;
+      varying float vShimmer;
 
       void main() {
         float distanceToCenter = length(gl_PointCoord - 0.5);
-        float alpha = smoothstep(0.5, 0.05, distanceToCenter) * 0.42 * vFade;
+        float alpha = smoothstep(0.5, 0.05, distanceToCenter) *
+          0.42 * vFade * vShimmer;
         gl_FragColor = vec4(vec3(0.60, 0.68, 0.39), alpha);
       }
     `
@@ -503,7 +645,12 @@ if (runtime) {
   animatedMaterials.push(sporeMaterial);
   disposables.push(sporeGeometry, sporeMaterial);
 
-  scene.add(new THREE.HemisphereLight(0x718578, 0x1b160e, 0.58));
+  const hemisphereLight = new THREE.HemisphereLight(
+    0x718578,
+    0x1b160e,
+    0.58
+  );
+  scene.add(hemisphereLight);
 
   const keyLight = new THREE.DirectionalLight(0xc6d7b5, 2.65);
   keyLight.position.set(-7, 10, 7);
@@ -539,6 +686,54 @@ if (runtime) {
   scene.add(rimLight, rimLight.target);
 
   const clockState = { elapsed: 0 };
+  const identityMotion = { x: 0, y: 0, tilt: 0 };
+
+  function updateIdentity(reducedMotion, delta, motionTime) {
+    if (!identity) return;
+
+    if (reducedMotion) {
+      identityMotion.x = 0;
+      identityMotion.y = 0;
+      identityMotion.tilt = 0;
+    } else {
+      identityMotion.x = THREE.MathUtils.damp(
+        identityMotion.x,
+        pointer.x * 7.5 * motionStrength,
+        2.4,
+        delta
+      );
+      identityMotion.y = THREE.MathUtils.damp(
+        identityMotion.y,
+        -pointer.y * 4.5 * motionStrength +
+          Math.sin(motionTime * 0.21) * 0.7 * motionStrength,
+        2.4,
+        delta
+      );
+      identityMotion.tilt = THREE.MathUtils.damp(
+        identityMotion.tilt,
+        -pointer.x * 0.08 * motionStrength,
+        2,
+        delta
+      );
+    }
+
+    identity.style.transform = `translate3d(calc(-50% + ${identityMotion.x.toFixed(2)}px), calc(-50% + ${identityMotion.y.toFixed(2)}px), 0) rotate(${identityMotion.tilt.toFixed(3)}deg)`;
+
+    if (titleLayers.length === 2) {
+      titleLayers[0].style.transform = reducedMotion
+        ? "none"
+        : `translate3d(${(identityMotion.x * 0.11).toFixed(2)}px, ${(identityMotion.y * 0.08).toFixed(2)}px, 0)`;
+      titleLayers[1].style.transform = reducedMotion
+        ? "none"
+        : `translate3d(${(-identityMotion.x * 0.055).toFixed(2)}px, ${(-identityMotion.y * 0.045).toFixed(2)}px, 0)`;
+    }
+
+    if (motto) {
+      motto.style.transform = reducedMotion
+        ? "none"
+        : `translate3d(${(-identityMotion.x * 0.16).toFixed(2)}px, ${(-identityMotion.y * 0.08).toFixed(2)}px, 0)`;
+    }
+  }
 
   function resize() {
     fitPerspectiveCamera(camera);
@@ -549,57 +744,172 @@ if (runtime) {
   }
 
   function render() {
-    const { delta, elapsed } = runtime.tick();
+    const { delta } = runtime.tick();
     const reducedMotion = prefersReducedMotion.matches;
     const timeScale = reducedMotion ? 0 : 1;
     clockState.elapsed += delta * timeScale;
+    const motionTime = clockState.elapsed;
+    const activePointerX = reducedMotion ? 0 : pointer.x * motionStrength;
+    const activePointerY = reducedMotion ? 0 : pointer.y * motionStrength;
 
     camera.position.x = THREE.MathUtils.damp(
       camera.position.x,
-      reducedMotion ? 0 : pointer.x * 0.72,
+      activePointerX * 0.78,
       2.2,
       delta
     );
     camera.position.y = THREE.MathUtils.damp(
       camera.position.y,
-      4.5 + (reducedMotion ? 0 : pointer.y * 0.3),
+      4.5 + activePointerY * 0.33,
       2.2,
       delta
     );
+    camera.position.z = reducedMotion
+      ? 13.8
+      : 13.8 + Math.sin(motionTime * 0.105) * 0.045 * motionStrength;
     cameraLook.x = THREE.MathUtils.damp(
       cameraLook.x,
-      reducedMotion ? 0 : pointer.x * 0.38,
+      activePointerX * 0.41,
       2,
       delta
     );
     cameraLook.y = THREE.MathUtils.damp(
       cameraLook.y,
-      cameraTarget.y + (reducedMotion ? 0 : pointer.y * 0.13),
+      cameraTarget.y + activePointerY * 0.15,
       2,
       delta
     );
     camera.lookAt(cameraLook);
+    if (!reducedMotion) {
+      camera.rotation.z +=
+        (-activePointerX * 0.0018 +
+          Math.sin(motionTime * 0.13) * 0.00055) *
+        motionStrength;
+    }
 
     garden.rotation.y = reducedMotion
       ? 0
-      : Math.sin(elapsed * 0.075) * 0.012 + pointer.x * 0.009;
+      : Math.sin(motionTime * 0.075) * 0.013 + activePointerX * 0.01;
+    garden.position.x = reducedMotion ? 0 : -activePointerX * 0.045;
+    monolith.position.y =
+      2.35 +
+      (reducedMotion
+        ? 0
+        : Math.sin(motionTime * 0.16) * 0.018 * motionStrength);
+    monolith.rotation.x =
+      -0.025 +
+      (reducedMotion
+        ? 0
+        : Math.sin(motionTime * 0.12 + 0.8) * 0.004 * motionStrength);
     monolith.rotation.y =
-      -0.12 + (reducedMotion ? 0 : Math.sin(elapsed * 0.1) * 0.014);
+      -0.12 +
+      (reducedMotion
+        ? 0
+        : Math.sin(motionTime * 0.1) * 0.016 +
+          activePointerX * 0.009);
+    monolith.rotation.z =
+      0.018 +
+      (reducedMotion
+        ? 0
+        : Math.cos(motionTime * 0.115) * 0.003 * motionStrength);
     facetMaterial.opacity =
-      0.17 + (reducedMotion ? 0 : Math.sin(elapsed * 0.42) * 0.035);
+      0.17 +
+      (reducedMotion ? 0 : Math.sin(motionTime * 0.42) * 0.035);
+    monolithMaterial.clearcoat =
+      monolithClearcoat +
+      (reducedMotion ? 0 : Math.sin(motionTime * 0.18) * 0.035);
+    monolithMaterial.emissiveIntensity =
+      0.2 +
+      (reducedMotion ? 0 : Math.sin(motionTime * 0.29 + 1.1) * 0.035);
     underLight.intensity =
-      34 + (reducedMotion ? 0 : Math.sin(elapsed * 0.36) * 4);
+      34 +
+      (reducedMotion ? 0 : Math.sin(motionTime * 0.36) * 3.5);
+    underLight.position.x = reducedMotion
+      ? 0
+      : Math.sin(motionTime * 0.16) * 0.35 + activePointerX * 0.2;
+    keyLight.position.x = reducedMotion
+      ? -7
+      : -7 + Math.sin(motionTime * 0.09) * 0.55;
+    keyLight.position.z = reducedMotion
+      ? 7
+      : 7 + Math.cos(motionTime * 0.09) * 0.42;
+    rimLight.intensity =
+      170 +
+      (reducedMotion ? 0 : Math.sin(motionTime * 0.21 + 0.8) * 10);
+    hemisphereLight.intensity =
+      0.58 +
+      (reducedMotion ? 0 : Math.sin(motionTime * 0.14) * 0.025);
+    terrainMaterial.emissiveIntensity =
+      0.12 +
+      (reducedMotion ? 0 : Math.sin(motionTime * 0.16 - 0.6) * 0.018);
+    rootsMaterial.opacity =
+      0.48 +
+      (reducedMotion ? 0 : Math.sin(motionTime * 0.24) * 0.045);
+    roots.rotation.y = reducedMotion
+      ? 0
+      : Math.sin(motionTime * 0.055) * 0.012;
+    ringMaterial.emissiveIntensity =
+      0.58 +
+      (reducedMotion ? 0 : Math.sin(motionTime * 0.25 + 0.9) * 0.09);
+    crownMaterial.emissiveIntensity =
+      0.04 +
+      (reducedMotion ? 0 : Math.sin(motionTime * 0.31 + 2.1) * 0.025);
 
-    skyMaterial.uniforms.uTime.value = clockState.elapsed;
+    orbitalRings.forEach((ring, index) => {
+      const ringMotion = reducedMotion
+        ? 0
+        : Math.sin(motionTime * (0.12 + index * 0.008) + ring.userData.phase);
+      ring.position.y = ring.userData.baseY + ringMotion * 0.018;
+      ring.rotation.y = reducedMotion
+        ? 0
+        : motionTime * (0.0025 + index * 0.00035) + ringMotion * 0.008;
+      ring.scale.x =
+        ring.userData.baseScale + ringMotion * 0.0025 * motionStrength;
+      ring.scale.z =
+        0.78 * ring.userData.baseScale -
+        ringMotion * 0.0025 * motionStrength;
+    });
+
+    skyMaterial.uniforms.uTime.value = motionTime;
     if (reducedMotion) {
       skyMaterial.uniforms.uPointer.value.set(0, 0);
+      auraMaterial.uniforms.uPointer.value.set(0, 0);
+      sporeMaterial.uniforms.uPointer.value.set(0, 0);
     } else {
-      skyMaterial.uniforms.uPointer.value.copy(pointer);
+      skyMaterial.uniforms.uPointer.value.set(
+        activePointerX,
+        activePointerY
+      );
+      auraMaterial.uniforms.uPointer.value.set(
+        activePointerX,
+        activePointerY
+      );
+      sporeMaterial.uniforms.uPointer.value.set(
+        activePointerX,
+        activePointerY
+      );
     }
-    sporeMaterial.uniforms.uTime.value = clockState.elapsed;
+    auraMaterial.uniforms.uTime.value = motionTime;
+    aura.position.x = reducedMotion ? 0 : activePointerX * -0.055;
+    aura.position.y =
+      2.45 +
+      (reducedMotion
+        ? 0
+        : Math.sin(motionTime * 0.13 + 0.4) * 0.025 * motionStrength);
+    aura.quaternion.copy(camera.quaternion);
+    sporeMaterial.uniforms.uTime.value = motionTime;
     if (stalkMaterial.userData.shader) {
-      stalkMaterial.userData.shader.uniforms.uTime.value = clockState.elapsed;
+      stalkMaterial.userData.shader.uniforms.uTime.value = motionTime;
+      if (reducedMotion) {
+        stalkMaterial.userData.shader.uniforms.uPointer.value.set(0, 0);
+      } else {
+        stalkMaterial.userData.shader.uniforms.uPointer.value.set(
+          activePointerX,
+          activePointerY
+        );
+      }
     }
+    updateIdentity(reducedMotion, delta, motionTime);
 
     renderer.render(scene, camera);
 
@@ -609,9 +919,13 @@ if (runtime) {
   }
 
   const onMotionPreferenceChange = () => renderer.setAnimationLoop(render);
+  const onVisibilityChange = () => {
+    renderer.setAnimationLoop(document.hidden ? null : render);
+  };
 
   window.addEventListener("resize", resize, { passive: true });
   prefersReducedMotion.addEventListener("change", onMotionPreferenceChange);
+  document.addEventListener("visibilitychange", onVisibilityChange);
   renderer.setAnimationLoop(render);
 
   window.addEventListener(
@@ -620,6 +934,7 @@ if (runtime) {
       renderer.setAnimationLoop(null);
       window.removeEventListener("resize", resize);
       prefersReducedMotion.removeEventListener("change", onMotionPreferenceChange);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       animatedMaterials.length = 0;
       disposables.forEach((item) => item.dispose());
       runtime.dispose();

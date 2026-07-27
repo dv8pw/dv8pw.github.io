@@ -14,11 +14,16 @@ if (runtime) {
   const scene = new THREE.Scene();
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
   const drawingBufferSize = new THREE.Vector2();
+  const identity = document.querySelector(".identity");
+  const pointerVelocity = new THREE.Vector2();
+  const pointerDelta = new THREE.Vector2();
+  const previousPointer = new THREE.Vector2();
 
   const uniforms = {
     uTime: { value: 0 },
     uResolution: { value: new THREE.Vector2(1, 1) },
-    uPointer: { value: new THREE.Vector2() }
+    uPointer: { value: new THREE.Vector2() },
+    uMotion: { value: 0 }
   };
 
   const fragmentShader = `
@@ -27,6 +32,7 @@ if (runtime) {
     uniform float uTime;
     uniform vec2 uResolution;
     uniform vec2 uPointer;
+    uniform float uMotion;
     varying vec2 vUv;
 
     float hash31(vec3 p) {
@@ -80,8 +86,13 @@ if (runtime) {
 
     void main() {
       vec2 pixel = (gl_FragCoord.xy * 2.0 - uResolution.xy) / min(uResolution.x, uResolution.y);
+      vec2 pointerPosition = uPointer * uResolution.xy / min(uResolution.x, uResolution.y);
+      vec2 pointerVector = pixel - pointerPosition;
+      float pointerDistance = length(pointerVector);
+      float lens = exp(-dot(pointerVector, pointerVector) * 1.8);
       vec2 drift = uPointer * vec2(0.12, 0.09);
       vec2 p = pixel * 0.76 + drift;
+      p += pointerVector * lens * (0.012 + uMotion * 0.045);
       float time = uTime * 0.115;
 
       vec3 qSeed = vec3(p * 1.25, time);
@@ -105,11 +116,24 @@ if (runtime) {
       vec3 mineral = vec3(0.52, 0.47, 0.54);
       vec3 ember = vec3(0.74, 0.29, 0.135);
       vec3 pearl = vec3(0.93, 0.88, 0.72);
+      vec3 spectral = vec3(0.10, 0.34, 0.40);
 
       vec3 color = mix(ink, plum, vapor * 0.88);
       color = mix(color, mineral, smoothstep(0.48, 0.78, field) * 0.58);
       color += ember * silk * (0.22 + 0.18 * q.y);
       color += pearl * pow(silk, 4.0) * 0.28;
+
+      float foldEdge = smoothstep(0.012, 0.09, fwidth(field));
+      float chroma = foldEdge * silk * (0.018 + uMotion * 0.07);
+      color.r += chroma * 0.72;
+      color.b += chroma * 0.96;
+
+      float wake = exp(-abs(pointerDistance - (0.30 + uMotion * 0.08)) * 30.0);
+      color += mix(spectral, pearl, 0.28) * wake * uMotion * 0.085;
+      color += spectral * lens * uMotion * 0.028;
+
+      float paletteBreath = sin(uTime * 0.055 + q.x * 2.0) * 0.5 + 0.5;
+      color += mix(vec3(0.018, 0.008, 0.026), vec3(0.006, 0.022, 0.026), paletteBreath) * vapor;
 
       float innerMist = exp(-dot(pixel * vec2(0.68, 1.0), pixel * vec2(0.68, 1.0)) * 0.7);
       color += vec3(0.045, 0.037, 0.052) * innerMist;
@@ -145,11 +169,47 @@ if (runtime) {
     renderer.getDrawingBufferSize(drawingBufferSize);
     uniforms.uResolution.value.copy(drawingBufferSize);
     if (reducedMotion) {
+      pointerVelocity.set(0, 0);
+      previousPointer.set(0, 0);
       uniforms.uPointer.value.set(0, 0);
+      uniforms.uMotion.value = 0;
     } else {
+      pointerVelocity
+        .lerp(pointerDelta.copy(pointer).sub(previousPointer), 0.18);
+      previousPointer.copy(pointer);
       uniforms.uPointer.value.copy(pointer);
+      uniforms.uMotion.value = THREE.MathUtils.clamp(
+        pointerVelocity.length() * 34,
+        0,
+        1
+      );
     }
     uniforms.uTime.value = reducedMotion ? 18.0 : elapsed;
+
+    if (identity) {
+      const x = reducedMotion ? 0 : pointer.x * 7;
+      const y = reducedMotion ? 0 : -pointer.y * 5;
+      const tiltX = reducedMotion ? 0 : pointer.y * -0.55;
+      const tiltY = reducedMotion ? 0 : pointer.x * 0.8;
+      identity.style.setProperty("--aether-x", `${x.toFixed(2)}px`);
+      identity.style.setProperty("--aether-y", `${y.toFixed(2)}px`);
+      identity.style.setProperty("--aether-tilt-x", `${tiltX.toFixed(3)}deg`);
+      identity.style.setProperty("--aether-tilt-y", `${tiltY.toFixed(3)}deg`);
+      identity.style.setProperty("--aether-motto-x", `${(-x * 0.3).toFixed(2)}px`);
+      identity.style.setProperty("--aether-motto-y", `${(-y * 0.3).toFixed(2)}px`);
+      identity.style.setProperty(
+        "--aether-motion",
+        uniforms.uMotion.value.toFixed(3)
+      );
+      identity.style.setProperty(
+        "--aether-glow",
+        `${(50 + uniforms.uMotion.value * 22).toFixed(2)}px`
+      );
+      identity.style.setProperty(
+        "--aether-glow-alpha",
+        (0.08 + uniforms.uMotion.value * 0.08).toFixed(3)
+      );
+    }
 
     renderer.render(scene, camera);
 
@@ -166,9 +226,13 @@ if (runtime) {
       animate();
     }
   };
+  const onVisibilityChange = () => {
+    renderer.setAnimationLoop(document.hidden ? null : animate);
+  };
 
   prefersReducedMotion.addEventListener("change", onMotionPreferenceChange);
   window.addEventListener("resize", onResize, { passive: true });
+  document.addEventListener("visibilitychange", onVisibilityChange);
 
   window.addEventListener(
     "pagehide",
@@ -176,6 +240,7 @@ if (runtime) {
       renderer.setAnimationLoop(null);
       prefersReducedMotion.removeEventListener("change", onMotionPreferenceChange);
       window.removeEventListener("resize", onResize);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       plane.geometry.dispose();
       material.dispose();
       runtime.dispose();

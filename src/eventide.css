@@ -24,12 +24,22 @@
 .experience::after {
   opacity: 0.055;
   mix-blend-mode: screen;
+  animation: eventide-grain-drift 16s steps(10, end) infinite;
 }
 
 .identity {
+  --identity-x: 0px;
+  --identity-y: 0px;
+  --signal-luma: 1;
+
   top: 50%;
   width: min(94vw, 100rem);
-  transform: translate(-50%, -50.5%);
+  transform:
+    translate(
+      calc(-50% + var(--identity-x)),
+      calc(-50.5% + var(--identity-y))
+    );
+  will-change: transform;
 }
 
 .identity::before,
@@ -40,8 +50,16 @@
   height: 1px;
   content: "";
   opacity: 0.48;
-  background: linear-gradient(90deg, transparent, #c8b685);
+  background:
+    linear-gradient(
+      90deg,
+      transparent 0 32%,
+      rgb(200 182 133 / 0.22) 50%,
+      #c8b685 100%
+    );
+  background-size: 180% 100%;
   box-shadow: 0 0 16px rgb(178 209 205 / 0.18);
+  animation: eventide-bracket-signal 9s ease-in-out infinite alternate;
 }
 
 .identity::before {
@@ -57,10 +75,13 @@
   padding-left: 0.125em;
   font-size: clamp(3.35rem, 12.8vw, 12.8rem);
   line-height: 0.76;
+  filter: brightness(var(--signal-luma));
   text-shadow:
     0 1px 0 rgb(255 255 255 / 0.28),
     0 0 18px rgb(3 8 10 / 0.88),
     0 0 62px rgb(3 8 10 / 0.9);
+  animation: eventide-title-breathe 12s ease-in-out infinite;
+  will-change: filter, text-shadow;
 }
 
 .motto {
@@ -71,6 +92,63 @@
   font-weight: 400;
   letter-spacing: 0.43em;
   text-shadow: 0 0 18px rgb(0 0 0 / 0.9);
+  animation: eventide-motto-signal 8s ease-in-out infinite;
+}
+
+@keyframes eventide-grain-drift {
+  0% {
+    transform: translate3d(-0.8%, -0.5%, 0) rotate(7deg);
+  }
+
+  50% {
+    transform: translate3d(0.65%, 0.35%, 0) rotate(7.12deg);
+  }
+
+  100% {
+    transform: translate3d(-0.35%, 0.7%, 0) rotate(6.94deg);
+  }
+}
+
+@keyframes eventide-bracket-signal {
+  0%,
+  28% {
+    opacity: 0.32;
+    background-position: 120% 0;
+  }
+
+  65%,
+  100% {
+    opacity: 0.54;
+    background-position: 0 0;
+  }
+}
+
+@keyframes eventide-title-breathe {
+  0%,
+  100% {
+    text-shadow:
+      0 1px 0 rgb(255 255 255 / 0.25),
+      0 0 18px rgb(3 8 10 / 0.88),
+      0 0 58px rgb(3 8 10 / 0.86);
+  }
+
+  50% {
+    text-shadow:
+      0 1px 0 rgb(255 255 255 / 0.3),
+      0 0 22px rgb(142 192 189 / 0.07),
+      0 0 70px rgb(3 8 10 / 0.94);
+  }
+}
+
+@keyframes eventide-motto-signal {
+  0%,
+  100% {
+    opacity: 0.82;
+  }
+
+  50% {
+    opacity: 1;
+  }
 }
 
 @media (max-width: 700px) {
@@ -111,5 +189,17 @@
 @media (prefers-reduced-motion: reduce) {
   .identity {
     transform: translate(-50%, -50%);
+  }
+
+  .experience::after,
+  .identity::before,
+  .identity::after,
+  .title,
+  .motto {
+    animation: none;
+  }
+
+  .title {
+    filter: none;
   }
 }
