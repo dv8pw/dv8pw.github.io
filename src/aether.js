@@ -187,16 +187,6 @@ if (runtime) {
     uniforms.uTime.value = reducedMotion ? 18.0 : elapsed;
 
     if (identity) {
-      const x = reducedMotion ? 0 : pointer.x * 7;
-      const y = reducedMotion ? 0 : -pointer.y * 5;
-      const tiltX = reducedMotion ? 0 : pointer.y * -0.55;
-      const tiltY = reducedMotion ? 0 : pointer.x * 0.8;
-      identity.style.setProperty("--aether-x", `${x.toFixed(2)}px`);
-      identity.style.setProperty("--aether-y", `${y.toFixed(2)}px`);
-      identity.style.setProperty("--aether-tilt-x", `${tiltX.toFixed(3)}deg`);
-      identity.style.setProperty("--aether-tilt-y", `${tiltY.toFixed(3)}deg`);
-      identity.style.setProperty("--aether-motto-x", `${(-x * 0.3).toFixed(2)}px`);
-      identity.style.setProperty("--aether-motto-y", `${(-y * 0.3).toFixed(2)}px`);
       identity.style.setProperty(
         "--aether-motion",
         uniforms.uMotion.value.toFixed(3)

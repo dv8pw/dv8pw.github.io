@@ -12,27 +12,12 @@
 }
 
 .identity {
-  --aether-x: 0px;
-  --aether-y: 0px;
-  --aether-tilt-x: 0deg;
-  --aether-tilt-y: 0deg;
-  --aether-motto-x: 0px;
-  --aether-motto-y: 0px;
   --aether-motion: 0;
   --aether-glow: 50px;
   --aether-glow-alpha: 0.08;
 
   mix-blend-mode: screen;
-  transform:
-    translate(
-      calc(-50% + var(--aether-x)),
-      calc(-50% + var(--aether-y))
-    )
-    perspective(900px)
-    rotateX(var(--aether-tilt-x))
-    rotateY(var(--aether-tilt-y));
-  transform-style: preserve-3d;
-  will-change: transform;
+  transform: translate(-50%, -50%);
 }
 
 .title {
@@ -56,17 +41,11 @@
     0 0 0.8px rgb(255 255 255 / 0.9),
     0 0 var(--aether-glow)
       rgb(205 184 225 / var(--aether-glow-alpha));
-  transform: translateZ(18px);
   animation: aether-sheen 13s ease-in-out infinite alternate;
 }
 
 .motto {
   margin-top: clamp(1.5rem, 3vw, 2.8rem);
-  transform: translate3d(
-    var(--aether-motto-x),
-    var(--aether-motto-y),
-    6px
-  );
   transition: opacity 600ms ease;
 }
 
@@ -130,7 +109,6 @@
   }
 
   .motto {
-    transform: none;
     transition: none;
   }
 

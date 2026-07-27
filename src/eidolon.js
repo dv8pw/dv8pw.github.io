@@ -5,7 +5,6 @@ import "./eidolon.css";
 
 const canvas = document.querySelector(".webgl");
 const experience = document.querySelector(".experience");
-const identity = document.querySelector(".identity");
 const runtime = createRuntime(canvas, {
   antialias: true,
   clearColor: 0xe9e6df,
@@ -192,40 +191,35 @@ if (runtime) {
   joints.receiveShadow = true;
   sculpture.add(joints);
 
-  const aureole = new THREE.Mesh(
-    new THREE.TorusGeometry(
-      1.03,
-      0.012,
-      5,
-      isCompact ? 72 : 108
-    ),
-    graphite
-  );
-  aureole.scale.y = 0.51;
-  aureole.position.z = 1.57;
-  aureole.rotation.z = -0.03;
-  sculpture.add(aureole);
-
-  const aureoleEchoMaterial = new THREE.MeshBasicMaterial({
+  const aureoleMaterial = new THREE.MeshBasicMaterial({
     color: 0x8b857c,
     transparent: true,
-    opacity: 0.13,
+    opacity: isCompact ? 0.085 : 0.105,
     depthWrite: false,
     toneMapped: false
   });
-  const aureoleEcho = new THREE.Mesh(
-    new THREE.TorusGeometry(
-      1.16,
-      0.006,
-      4,
-      isCompact ? 64 : 96
-    ),
-    aureoleEchoMaterial
+  const aureoleArcGeometry = new THREE.TorusGeometry(
+    1.66,
+    0.006,
+    4,
+    isCompact ? 56 : 80,
+    Math.PI * 0.49
   );
-  aureoleEcho.scale.y = 0.51;
-  aureoleEcho.position.z = 1.545;
-  aureoleEcho.rotation.z = 0.018;
-  sculpture.add(aureoleEcho);
+  const aureole = new THREE.Group();
+  const aureoleRight = new THREE.Mesh(
+    aureoleArcGeometry,
+    aureoleMaterial
+  );
+  const aureoleLeft = new THREE.Mesh(
+    aureoleArcGeometry,
+    aureoleMaterial
+  );
+  aureoleRight.rotation.z = -Math.PI * 0.245;
+  aureoleLeft.rotation.z = Math.PI * 0.755;
+  aureole.add(aureoleRight, aureoleLeft);
+  aureole.scale.y = 0.68;
+  aureole.position.set(0, 0.08, 0.72);
+  sculpture.add(aureole);
 
   const wall = new THREE.Mesh(
     new THREE.PlaneGeometry(30, 22),
@@ -264,8 +258,6 @@ if (runtime) {
   const baseKeyPosition = key.position.clone();
   const baseEdgePosition = edge.position.clone();
   const baseKeyTarget = key.target.position.clone();
-  const parallax = new THREE.Vector2();
-  const parallaxVelocity = new THREE.Vector2();
   let baseCameraZ = 10.2;
   let animationFrame;
 
@@ -277,22 +269,16 @@ if (runtime) {
     sculpture.scale.setScalar(portrait ? 0.92 : 1);
   };
 
-  const setIdentityDepth = (x = 0, y = 0, pulse = 0) => {
-    experience.style.setProperty("--eidolon-focus-x", `${50 + x * 2.2}%`);
-    experience.style.setProperty("--eidolon-focus-y", `${44 - y * 1.5}%`);
-    identity.style.setProperty("--eidolon-title-x", `${x * -4.5}px`);
-    identity.style.setProperty("--eidolon-title-y", `${y * 3}px`);
-    identity.style.setProperty("--eidolon-shadow-x", `${x * 2.5}px`);
-    identity.style.setProperty("--eidolon-shadow-y", `${2.6 - y * 1.4}px`);
-    identity.style.setProperty(
+  const setAtmosphere = (x = 0, y = 0, pulse = 0) => {
+    experience.style.setProperty("--eidolon-focus-x", `${50 + x * 1.4}%`);
+    experience.style.setProperty("--eidolon-focus-y", `${44 - y * 1.1}%`);
+    experience.style.setProperty(
       "--eidolon-line-breath",
       `${1 + pulse * 0.028}`
     );
   };
 
   const setStaticPose = () => {
-    parallax.set(0, 0);
-    parallaxVelocity.set(0, 0);
     sculpture.rotation.copy(baseRotation);
     sculpture.position.set(0, 0, 0);
     camera.position.set(0, 0.05, baseCameraZ);
@@ -309,13 +295,10 @@ if (runtime) {
       rib.rotation.set(0, 0, 0);
     }
 
-    aureole.position.z = 1.57;
-    aureole.rotation.z = -0.03;
-    aureole.scale.set(1, 0.51, 1);
-    aureoleEcho.position.z = 1.545;
-    aureoleEcho.rotation.z = 0.018;
-    aureoleEcho.scale.set(1, 0.51, 1);
-    aureoleEchoMaterial.opacity = 0.13;
+    aureole.position.set(0, 0.08, 0.72);
+    aureole.rotation.set(0, 0, 0);
+    aureole.scale.set(1, 0.68, 1);
+    aureoleMaterial.opacity = isCompact ? 0.085 : 0.105;
 
     key.position.copy(baseKeyPosition);
     key.target.position.copy(baseKeyTarget);
@@ -325,59 +308,37 @@ if (runtime) {
     porcelain.clearcoat = 0.45;
     porcelain.sheen = 0.25;
     graphite.roughness = 0.32;
-    setIdentityDepth();
+    setAtmosphere();
   };
 
   const render = () => {
-    const { delta, elapsed } = runtime.tick();
+    const { elapsed } = runtime.tick();
     const reduced = prefersReducedMotion.matches;
     if (reduced) {
       setStaticPose();
     } else {
-      const springStrength = 15.5;
-      const springDamping = Math.exp(-7.2 * delta);
-      parallaxVelocity.x +=
-        (pointer.x - parallax.x) * springStrength * delta;
-      parallaxVelocity.y +=
-        (pointer.y - parallax.y) * springStrength * delta;
-      parallaxVelocity.multiplyScalar(springDamping);
-      parallax.addScaledVector(parallaxVelocity, delta);
-
-      const ease = 1 - Math.exp(-delta * 2.7);
+      const pointerX = pointer.x;
+      const pointerY = pointer.y;
       const breathe = Math.sin(elapsed * 0.31);
       const drift = Math.sin(elapsed * 0.115);
       const targetX =
-        baseRotation.x - parallax.y * 0.065 + drift * 0.006;
+        baseRotation.x - pointerY * 0.045 + drift * 0.006;
       const targetY =
-        baseRotation.y + parallax.x * 0.125 + breathe * 0.022;
+        baseRotation.y + pointerX * 0.085 + breathe * 0.022;
       const targetZ =
-        baseRotation.z + parallax.x * parallax.y * 0.012 +
+        baseRotation.z + pointerX * pointerY * 0.008 +
         Math.sin(elapsed * 0.19) * 0.006;
 
-      sculpture.rotation.x = THREE.MathUtils.lerp(
-        sculpture.rotation.x,
-        targetX,
-        ease
-      );
-      sculpture.rotation.y = THREE.MathUtils.lerp(
-        sculpture.rotation.y,
-        targetY,
-        ease
-      );
-      sculpture.rotation.z = THREE.MathUtils.lerp(
-        sculpture.rotation.z,
-        targetZ,
-        ease
-      );
-      sculpture.position.x = parallax.x * 0.026;
+      sculpture.rotation.set(targetX, targetY, targetZ);
+      sculpture.position.x = pointerX * 0.018;
       sculpture.position.y =
-        Math.sin(elapsed * 0.43) * 0.032 - parallax.y * 0.018;
+        Math.sin(elapsed * 0.43) * 0.032 - pointerY * 0.012;
       sculpture.position.z = Math.cos(elapsed * 0.21) * 0.018;
 
-      camera.position.x = parallax.x * 0.085;
-      camera.position.y = 0.05 + parallax.y * 0.055;
+      camera.position.x = pointerX * 0.055;
+      camera.position.y = 0.05 + pointerY * 0.035;
       camera.position.z = baseCameraZ;
-      camera.lookAt(parallax.x * 0.018, parallax.y * 0.012, 0);
+      camera.lookAt(pointerX * 0.012, pointerY * 0.008, 0);
 
       for (const hoop of hoopMeshes) {
         const phase = hoop.userData.motionPhase;
@@ -399,18 +360,16 @@ if (runtime) {
       }
 
       const aureolePulse = Math.sin(elapsed * 0.36);
-      const aureoleScale = 1 + aureolePulse * 0.005;
-      aureole.rotation.z = -0.03 + elapsed * 0.006;
-      aureole.position.z = 1.57 + Math.sin(elapsed * 0.27) * 0.012;
-      aureole.scale.set(aureoleScale, 0.51 / aureoleScale, 1);
-      aureoleEcho.rotation.z = 0.018 - elapsed * 0.004;
-      aureoleEcho.position.z = 1.545 + Math.cos(elapsed * 0.23) * 0.009;
-      aureoleEcho.scale.set(
-        1 - aureolePulse * 0.004,
-        0.51 + aureolePulse * 0.003,
+      aureole.rotation.z = Math.sin(elapsed * 0.17) * 0.007;
+      aureole.position.y = 0.08 + Math.sin(elapsed * 0.23) * 0.008;
+      aureole.position.z = 0.72 + Math.cos(elapsed * 0.27) * 0.008;
+      aureole.scale.set(
+        1 + aureolePulse * 0.003,
+        0.68 - aureolePulse * 0.002,
         1
       );
-      aureoleEchoMaterial.opacity = 0.115 + aureolePulse * 0.018;
+      aureoleMaterial.opacity =
+        (isCompact ? 0.08 : 0.1) + aureolePulse * 0.01;
 
       const lightOrbit = elapsed * 0.135;
       key.position.set(
@@ -419,8 +378,8 @@ if (runtime) {
         baseKeyPosition.z + Math.cos(lightOrbit) * 0.24
       );
       key.target.position.set(
-        baseKeyTarget.x + parallax.x * 0.11,
-        baseKeyTarget.y + parallax.y * 0.07,
+        baseKeyTarget.x + pointerX * 0.075,
+        baseKeyTarget.y + pointerY * 0.05,
         baseKeyTarget.z
       );
       key.intensity = 4.2 + Math.sin(elapsed * 0.29) * 0.18;
@@ -434,7 +393,7 @@ if (runtime) {
       porcelain.clearcoat = 0.45 + Math.sin(elapsed * 0.22) * 0.035;
       porcelain.sheen = 0.25 + Math.cos(elapsed * 0.26) * 0.035;
       graphite.roughness = 0.32 + Math.sin(elapsed * 0.24) * 0.025;
-      setIdentityDepth(parallax.x, parallax.y, breathe);
+      setAtmosphere(pointerX, pointerY, breathe);
     }
 
     renderer.render(scene, camera);

@@ -5,8 +5,6 @@ import "./null-garden.css";
 
 const canvas = document.querySelector(".webgl");
 const identity = document.querySelector(".identity");
-const titleLayers = document.querySelectorAll(".title span");
-const motto = document.querySelector(".motto");
 const runtime = canvas
   ? createRuntime(canvas, {
       antialias: true,
@@ -322,6 +320,109 @@ if (runtime) {
   facets.renderOrder = 2;
   monolith.add(facets);
   disposables.push(facetGeometry, facetMaterial);
+
+  const shellMaterial = new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    uniforms: {
+      uTime: { value: 0 },
+      uPointer: { value: new THREE.Vector2() }
+    },
+    vertexShader: `
+      uniform float uTime;
+      uniform vec2 uPointer;
+      varying vec3 vNormal;
+      varying vec3 vViewDirection;
+      varying float vHeight;
+
+      void main() {
+        float pulse = sin(
+          position.y * 3.4 +
+          position.x * 2.2 -
+          uTime * 0.38 +
+          uPointer.x * 1.5
+        );
+        vec3 displaced = position + normal * (0.012 + pulse * 0.006);
+        vec4 viewPosition = modelViewMatrix * vec4(displaced, 1.0);
+        vNormal = normalize(normalMatrix * normal);
+        vViewDirection = normalize(-viewPosition.xyz);
+        vHeight = position.y;
+        gl_Position = projectionMatrix * viewPosition;
+      }
+    `,
+    fragmentShader: `
+      uniform float uTime;
+      uniform vec2 uPointer;
+      varying vec3 vNormal;
+      varying vec3 vViewDirection;
+      varying float vHeight;
+
+      void main() {
+        float fresnel = pow(
+          1.0 - clamp(dot(vViewDirection, normalize(vNormal)), 0.0, 1.0),
+          2.7
+        );
+        float scan = pow(
+          1.0 - abs(sin(vHeight * 7.0 - uTime * 0.31 + uPointer.y)),
+          14.0
+        );
+        float alpha = fresnel * (0.045 + scan * 0.11);
+        vec3 color = mix(
+          vec3(0.20, 0.34, 0.16),
+          vec3(0.58, 0.72, 0.36),
+          scan
+        );
+        gl_FragColor = vec4(color, alpha);
+      }
+    `
+  });
+  const ghostShell = new THREE.Mesh(monolithGeometry, shellMaterial);
+  ghostShell.scale.setScalar(1.026);
+  ghostShell.renderOrder = 3;
+  monolith.add(ghostShell);
+  animatedMaterials.push(shellMaterial);
+  disposables.push(shellMaterial);
+
+  const tendrilGroup = new THREE.Group();
+  tendrilGroup.position.copy(monolith.position);
+  garden.add(tendrilGroup);
+  const tendrilColors = [0x7f9854, 0x657e58, 0xa4aa62];
+
+  for (let strand = 0; strand < 3; strand += 1) {
+    const points = [];
+    const turns = 22;
+    for (let index = 0; index < turns; index += 1) {
+      const angle = (index / turns) * Math.PI * 2;
+      const phase = strand * 2.094;
+      points.push(
+        new THREE.Vector3(
+          Math.cos(angle + phase) * (2.3 + strand * 0.17),
+          Math.sin(angle) * (4.75 - strand * 0.25),
+          Math.sin(angle * 2 + phase) * (0.48 + strand * 0.1)
+        )
+      );
+    }
+    const curve = new THREE.CatmullRomCurve3(points, true, "centripetal");
+    const geometry = new THREE.TubeGeometry(
+      curve,
+      isCompact ? 72 : 112,
+      0.012 + strand * 0.003,
+      4,
+      true
+    );
+    const material = new THREE.MeshBasicMaterial({
+      color: tendrilColors[strand],
+      transparent: true,
+      opacity: 0.14 - strand * 0.02,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    const tendril = new THREE.Mesh(geometry, material);
+    tendril.userData.phase = strand * 1.7;
+    tendrilGroup.add(tendril);
+    disposables.push(geometry, material);
+  }
 
   const auraGeometry = new THREE.PlaneGeometry(11.5, 12.5);
   const auraCurrentExpression = isCompact
@@ -686,53 +787,21 @@ if (runtime) {
   scene.add(rimLight, rimLight.target);
 
   const clockState = { elapsed: 0 };
-  const identityMotion = { x: 0, y: 0, tilt: 0 };
+  let lastIdentityX = Number.NaN;
+  let lastIdentityY = Number.NaN;
 
-  function updateIdentity(reducedMotion, delta, motionTime) {
+  function updateIdentity(reducedMotion) {
     if (!identity) return;
 
-    if (reducedMotion) {
-      identityMotion.x = 0;
-      identityMotion.y = 0;
-      identityMotion.tilt = 0;
-    } else {
-      identityMotion.x = THREE.MathUtils.damp(
-        identityMotion.x,
-        pointer.x * 7.5 * motionStrength,
-        2.4,
-        delta
-      );
-      identityMotion.y = THREE.MathUtils.damp(
-        identityMotion.y,
-        -pointer.y * 4.5 * motionStrength +
-          Math.sin(motionTime * 0.21) * 0.7 * motionStrength,
-        2.4,
-        delta
-      );
-      identityMotion.tilt = THREE.MathUtils.damp(
-        identityMotion.tilt,
-        -pointer.x * 0.08 * motionStrength,
-        2,
-        delta
-      );
-    }
+    const x = reducedMotion ? 0 : pointer.x * 4.5 * motionStrength;
+    const y = reducedMotion ? 0 : -pointer.y * 3.2 * motionStrength;
+    if (x === lastIdentityX && y === lastIdentityY) return;
 
-    identity.style.transform = `translate3d(calc(-50% + ${identityMotion.x.toFixed(2)}px), calc(-50% + ${identityMotion.y.toFixed(2)}px), 0) rotate(${identityMotion.tilt.toFixed(3)}deg)`;
-
-    if (titleLayers.length === 2) {
-      titleLayers[0].style.transform = reducedMotion
-        ? "none"
-        : `translate3d(${(identityMotion.x * 0.11).toFixed(2)}px, ${(identityMotion.y * 0.08).toFixed(2)}px, 0)`;
-      titleLayers[1].style.transform = reducedMotion
-        ? "none"
-        : `translate3d(${(-identityMotion.x * 0.055).toFixed(2)}px, ${(-identityMotion.y * 0.045).toFixed(2)}px, 0)`;
-    }
-
-    if (motto) {
-      motto.style.transform = reducedMotion
-        ? "none"
-        : `translate3d(${(-identityMotion.x * 0.16).toFixed(2)}px, ${(-identityMotion.y * 0.08).toFixed(2)}px, 0)`;
-    }
+    identity.style.transform =
+      `translate(calc(-50% + ${x.toFixed(3)}px), ` +
+      `calc(-50% + ${y.toFixed(3)}px))`;
+    lastIdentityX = x;
+    lastIdentityY = y;
   }
 
   function resize() {
@@ -752,40 +821,19 @@ if (runtime) {
     const activePointerX = reducedMotion ? 0 : pointer.x * motionStrength;
     const activePointerY = reducedMotion ? 0 : pointer.y * motionStrength;
 
-    camera.position.x = THREE.MathUtils.damp(
-      camera.position.x,
-      activePointerX * 0.78,
-      2.2,
-      delta
-    );
-    camera.position.y = THREE.MathUtils.damp(
-      camera.position.y,
-      4.5 + activePointerY * 0.33,
-      2.2,
-      delta
-    );
+    camera.position.x = activePointerX * 0.66;
+    camera.position.y = 4.5 + activePointerY * 0.28;
     camera.position.z = reducedMotion
       ? 13.8
       : 13.8 + Math.sin(motionTime * 0.105) * 0.045 * motionStrength;
-    cameraLook.x = THREE.MathUtils.damp(
-      cameraLook.x,
-      activePointerX * 0.41,
-      2,
-      delta
-    );
-    cameraLook.y = THREE.MathUtils.damp(
-      cameraLook.y,
-      cameraTarget.y + activePointerY * 0.15,
-      2,
-      delta
-    );
+    cameraLook.x = activePointerX * 0.36;
+    cameraLook.y = cameraTarget.y + activePointerY * 0.13;
     camera.lookAt(cameraLook);
-    if (!reducedMotion) {
-      camera.rotation.z +=
-        (-activePointerX * 0.0018 +
+    camera.rotation.z = reducedMotion
+      ? 0
+      : (-activePointerX * 0.0018 +
           Math.sin(motionTime * 0.13) * 0.00055) *
         motionStrength;
-    }
 
     garden.rotation.y = reducedMotion
       ? 0
@@ -821,6 +869,27 @@ if (runtime) {
     monolithMaterial.emissiveIntensity =
       0.2 +
       (reducedMotion ? 0 : Math.sin(motionTime * 0.29 + 1.1) * 0.035);
+    shellMaterial.uniforms.uTime.value = motionTime;
+    shellMaterial.uniforms.uPointer.value.set(
+      activePointerX,
+      activePointerY
+    );
+    tendrilGroup.rotation.x = reducedMotion
+      ? 0
+      : Math.sin(motionTime * 0.08) * 0.025 + activePointerY * 0.012;
+    tendrilGroup.rotation.y = reducedMotion
+      ? 0
+      : motionTime * 0.018 + activePointerX * 0.035;
+    tendrilGroup.rotation.z = reducedMotion
+      ? 0
+      : Math.cos(motionTime * 0.065) * 0.018;
+    tendrilGroup.children.forEach((tendril) => {
+      tendril.material.opacity =
+        0.105 +
+        (reducedMotion
+          ? 0
+          : Math.sin(motionTime * 0.23 + tendril.userData.phase) * 0.025);
+    });
     underLight.intensity =
       34 +
       (reducedMotion ? 0 : Math.sin(motionTime * 0.36) * 3.5);
@@ -909,7 +978,7 @@ if (runtime) {
         );
       }
     }
-    updateIdentity(reducedMotion, delta, motionTime);
+    updateIdentity(reducedMotion);
 
     renderer.render(scene, camera);
 

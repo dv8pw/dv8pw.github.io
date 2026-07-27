@@ -9,10 +9,6 @@
 .experience {
   --eidolon-focus-x: 50%;
   --eidolon-focus-y: 44%;
-  --eidolon-title-x: 0px;
-  --eidolon-title-y: 0px;
-  --eidolon-shadow-x: 0px;
-  --eidolon-shadow-y: 2.6px;
   --eidolon-line-breath: 1;
 
   background:
@@ -39,14 +35,6 @@
 .identity {
   top: 50.5%;
   width: min(95vw, 86rem);
-  transform:
-    translate(-50%, -50%)
-    translate3d(
-      var(--eidolon-title-x),
-      var(--eidolon-title-y),
-      0
-    );
-  will-change: transform;
 }
 
 .identity::before,
@@ -81,7 +69,8 @@
   text-indent: 0.135em;
   text-shadow:
     0 1px 0 rgb(255 255 255 / 0.64),
-    var(--eidolon-shadow-x) var(--eidolon-shadow-y) 22px rgb(94 84 72 / 0.14);
+    0 0 10px rgb(239 236 229 / 0.76),
+    0 3px 24px rgb(94 84 72 / 0.15);
 }
 
 .motto {
@@ -91,7 +80,9 @@
   font-weight: 600;
   letter-spacing: 0.42em;
   text-indent: 0.42em;
-  text-shadow: 0 1px 0 rgb(255 255 255 / 0.68);
+  text-shadow:
+    0 1px 0 rgb(255 255 255 / 0.68),
+    0 0 9px rgb(239 236 229 / 0.92);
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -149,21 +140,11 @@
   .experience {
     --eidolon-focus-x: 50% !important;
     --eidolon-focus-y: 44% !important;
-    --eidolon-title-x: 0px !important;
-    --eidolon-title-y: 0px !important;
-    --eidolon-shadow-x: 0px !important;
-    --eidolon-shadow-y: 2.6px !important;
     --eidolon-line-breath: 1 !important;
   }
 
   .identity {
-    --eidolon-title-x: 0px !important;
-    --eidolon-title-y: 0px !important;
-    --eidolon-shadow-x: 0px !important;
-    --eidolon-shadow-y: 2.6px !important;
     --eidolon-line-breath: 1 !important;
-
-    will-change: auto;
   }
 
   .webgl {

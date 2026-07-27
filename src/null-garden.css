@@ -37,8 +37,7 @@
 .identity {
   top: 49%;
   width: min(92vw, 76rem);
-  filter: drop-shadow(0 3px 18px rgb(0 0 0 / 0.72));
-  transform: translate3d(-50%, -50%, 0);
+  transform: translate(-50%, -50%);
 }
 
 .identity::before {
@@ -55,11 +54,6 @@
   );
   filter: blur(26px);
   transform: translateY(-50%);
-}
-
-.title span,
-.motto {
-  transform: translate3d(0, 0, 0);
 }
 
 .title {
@@ -122,9 +116,7 @@
     will-change: transform;
   }
 
-  .identity,
-  .title span,
-  .motto {
+  .identity {
     will-change: transform;
   }
 
@@ -199,8 +191,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .identity {
-    filter: drop-shadow(0 3px 14px rgb(0 0 0 / 0.78));
-    transform: translate3d(-50%, -50%, 0) !important;
+    transform: translate(-50%, -50%) !important;
   }
 
   .identity::before {
@@ -209,8 +200,4 @@
     transform: translateY(-50%);
   }
 
-  .title span,
-  .motto {
-    transform: none !important;
-  }
 }

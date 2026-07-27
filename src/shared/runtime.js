@@ -1,5 +1,11 @@
 import * as THREE from "three";
 
+function sCurve(value) {
+  const magnitude = THREE.MathUtils.clamp(Math.abs(value), 0, 1);
+  const smooth = magnitude * magnitude * (3 - 2 * magnitude);
+  return Math.sign(value) * (magnitude * 0.24 + smooth * 0.76);
+}
+
 export function createRuntime(canvas, options = {}) {
   const {
     antialias = true,
@@ -39,10 +45,14 @@ export function createRuntime(canvas, options = {}) {
       (clientX / window.innerWidth) * 2 - 1,
       1 - (clientY / window.innerHeight) * 2
     );
+    pointer.set(sCurve(pointerTarget.x), sCurve(pointerTarget.y));
   };
 
   const onPointerMove = (event) => updatePointer(event.clientX, event.clientY);
-  const onPointerLeave = () => pointerTarget.set(0, 0);
+  const onPointerLeave = () => {
+    pointer.set(0, 0);
+    pointerTarget.set(0, 0);
+  };
   const onResize = () => {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, maxPixelRatio));
     renderer.setSize(window.innerWidth, window.innerHeight, false);
@@ -59,7 +69,6 @@ export function createRuntime(canvas, options = {}) {
     timer,
     prefersReducedMotion,
     tick() {
-      pointer.lerp(pointerTarget, prefersReducedMotion.matches ? 0.03 : 0.055);
       timer.update();
       return {
         delta: Math.min(timer.getDelta(), 0.05),

@@ -3,10 +3,11 @@ import "./eventide.css";
 import { createRuntime, fitPerspectiveCamera } from "./shared/runtime.js";
 
 const canvas = document.querySelector(".webgl");
+const isCompact = window.matchMedia("(max-width: 700px)").matches;
 const runtime = createRuntime(canvas, {
   antialias: true,
   clearColor: 0x020609,
-  maxPixelRatio: 1.5
+  maxPixelRatio: isCompact ? 1.15 : 1.35
 });
 
 if (runtime) {
@@ -282,52 +283,43 @@ if (runtime) {
         }
       `,
       fragmentShader: `
-        precision highp float;
+        precision mediump float;
 
         varying vec2 vUv;
         uniform float uTime;
         uniform vec2 uPointer;
         uniform float uSignal;
 
-        float hash(vec2 p) {
-          return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
-        }
-
-        float noise(float x) {
-          float i = floor(x);
-          float f = fract(x);
-          float u = f * f * (3.0 - 2.0 * f);
-          return mix(hash(vec2(i, 5.31)), hash(vec2(i + 1.0, 5.31)), u);
-        }
-
-        float fbm(float x) {
-          float value = noise(x) * 0.57;
-          value += noise(x * 2.03 + 17.4) * 0.28;
-          value += noise(x * 4.11 - 9.7) * 0.15;
-          return value;
-        }
-
         void main() {
           vec2 p = vUv - 0.5;
           float radius = length(p);
           float angle = atan(p.y, p.x);
-          float angularNoise = fbm(angle * 13.0 + uTime * 0.025);
-          float roughness = (angularNoise - 0.5) * 0.011;
-          roughness += sin(angle * 19.0 - uTime * 0.07) * 0.0017;
 
-          float ringDistance = abs(radius - 0.273 - roughness);
-          float ring = 1.0 - smoothstep(0.002, 0.034, ringDistance);
-          float innerEdge = exp(-abs(radius - 0.269) * 62.0) * 0.28;
-          float outerBloom = exp(-abs(radius - 0.289) * 19.0) * 0.2;
+          float roughness =
+            sin(angle * 13.0 + uTime * 0.055) * 0.0029
+            + sin(angle * 31.0 - uTime * 0.082) * 0.0017
+            + sin(angle * 67.0 + uTime * 0.034) * 0.0008;
+          float ringDistance = abs(radius - 0.288 - roughness);
+          float ring = 1.0 - smoothstep(0.002, 0.025, ringDistance);
+          float innerEdge = exp(-abs(radius - 0.286) * 74.0) * 0.24;
+          float outerBloom = exp(-max(0.0, radius - 0.29) * 19.0) * 0.17;
 
-          float rayCell = floor((angle + 3.14159265) * 18.0);
-          float raySeed = hash(vec2(rayCell, 11.7));
-          float rayShape = pow(
-            max(0.0, sin(angle * (43.0 + raySeed * 19.0) + raySeed * 21.0)),
-            8.0
+          float rayWarp =
+            sin(angle * 7.0 - uTime * 0.018) * 1.35
+            + sin(angle * 17.0 + uTime * 0.026) * 0.48;
+          float rayA = pow(
+            0.5 + 0.5 * sin(angle * 47.0 + rayWarp + uTime * 0.035),
+            9.0
           );
-          float rayReach = exp(-max(0.0, radius - 0.278) * (18.0 + raySeed * 38.0));
-          float rays = smoothstep(0.275, 0.292, radius) * rayShape * rayReach;
+          float rayB = pow(
+            0.5 + 0.5 * sin(angle * 73.0 - rayWarp * 0.7 - uTime * 0.021),
+            13.0
+          );
+          float rayReach = exp(-max(0.0, radius - 0.29) * 24.0);
+          float rays =
+            smoothstep(0.286, 0.298, radius)
+            * (rayA * 0.7 + rayB * 0.3)
+            * rayReach;
 
           float pointerAzimuth = uPointer.x * 0.15 - uPointer.y * 0.08;
           float directional = 0.3 + 0.7 * pow(
@@ -339,13 +331,16 @@ if (runtime) {
             54.0
           );
           float pulse = 0.965 + sin(uTime * 0.38 + angle * 2.0) * 0.035;
+          float innerFade = smoothstep(0.276, 0.287, radius);
+          float outerFade = 1.0 - smoothstep(0.39, 0.495, radius);
+          float radialEnvelope = innerFade * outerFade;
           float alpha = (
             ring * 0.72
             + innerEdge
             + outerBloom
             + rays * 0.34
             + sweep * (0.08 + uSignal * 0.12)
-          ) * directional * pulse;
+          ) * directional * pulse * radialEnvelope;
 
           vec3 cool = vec3(0.34, 0.72, 0.72);
           vec3 warm = vec3(0.94, 0.66, 0.28);
@@ -359,19 +354,27 @@ if (runtime) {
       transparent: true,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
-      depthTest: false,
+      depthTest: true,
       toneMapped: false
     })
   );
   const halo = new THREE.Mesh(
-    registerGeometry(new THREE.PlaneGeometry(9.4, 9.4)),
+    registerGeometry(
+      new THREE.RingGeometry(2.46, 4.45, isCompact ? 72 : 112, 1)
+    ),
     haloMaterial
   );
   halo.position.z = -0.42;
   scene.add(halo);
 
   const eclipse = new THREE.Mesh(
-    registerGeometry(new THREE.SphereGeometry(2.56, 48, 32)),
+    registerGeometry(
+      new THREE.SphereGeometry(
+        2.56,
+        isCompact ? 36 : 48,
+        isCompact ? 24 : 32
+      )
+    ),
     registerMaterial(
       new THREE.MeshBasicMaterial({
         color: 0x010304
@@ -382,7 +385,9 @@ if (runtime) {
   scene.add(eclipse);
 
   const rim = new THREE.Mesh(
-    registerGeometry(new THREE.RingGeometry(2.55, 2.575, 192)),
+    registerGeometry(
+      new THREE.RingGeometry(2.55, 2.575, isCompact ? 128 : 192)
+    ),
     registerMaterial(
       new THREE.MeshBasicMaterial({
         color: 0x88b7b2,
@@ -393,6 +398,7 @@ if (runtime) {
       })
     )
   );
+  const rimMaterial = rim.material;
   rim.position.z = 0.1;
   scene.add(rim);
 
@@ -451,8 +457,107 @@ if (runtime) {
     seed = (seed * 16807) % 2147483647;
     return (seed - 1) / 2147483646;
   };
-  const isCompact = window.matchMedia("(max-width: 700px)").matches;
-  const starCount = isCompact ? 320 : 620;
+  const accretionCount = isCompact ? 58 : 110;
+  const accretionPositions = new Float32Array(accretionCount * 3);
+  const accretionColors = new Float32Array(accretionCount * 3);
+  const accretionPhases = new Float32Array(accretionCount);
+  const accretionSizes = new Float32Array(accretionCount);
+  const accretionCool = new THREE.Color(0x68a8aa);
+  const accretionWarm = new THREE.Color(0xd5b46c);
+  const accretionColor = new THREE.Color();
+
+  for (let index = 0; index < accretionCount; index += 1) {
+    const offset = index * 3;
+    const angle = random() * Math.PI * 2;
+    const radius = 2.82 + Math.pow(random(), 0.72) * 1.55;
+    const warmth = 0.2 + random() * 0.8;
+    accretionPositions[offset] = Math.cos(angle) * radius;
+    accretionPositions[offset + 1] =
+      Math.sin(angle) * radius * (0.16 + random() * 0.12);
+    accretionPositions[offset + 2] =
+      Math.sin(angle) * 0.23 + (random() - 0.5) * 0.16;
+    accretionColor.copy(accretionCool).lerp(accretionWarm, warmth);
+    accretionColors[offset] = accretionColor.r;
+    accretionColors[offset + 1] = accretionColor.g;
+    accretionColors[offset + 2] = accretionColor.b;
+    accretionPhases[index] = random() * Math.PI * 2;
+    accretionSizes[index] = 0.45 + random() * 0.9;
+  }
+
+  const accretionGeometry = registerGeometry(
+    new THREE.BufferGeometry()
+      .setAttribute(
+        "position",
+        new THREE.BufferAttribute(accretionPositions, 3)
+      )
+      .setAttribute(
+        "color",
+        new THREE.BufferAttribute(accretionColors, 3)
+      )
+      .setAttribute(
+        "aPhase",
+        new THREE.BufferAttribute(accretionPhases, 1)
+      )
+      .setAttribute(
+        "aSize",
+        new THREE.BufferAttribute(accretionSizes, 1)
+      )
+  );
+  const accretionMaterial = registerMaterial(
+    new THREE.ShaderMaterial({
+      uniforms: {
+        uTime: { value: 0 }
+      },
+      vertexShader: `
+        attribute float aPhase;
+        attribute float aSize;
+        uniform float uTime;
+        varying vec3 vColor;
+        varying float vPulse;
+
+        void main() {
+          vec3 transformed = position;
+          float shimmer = sin(uTime * 0.47 + aPhase) * 0.5 + 0.5;
+          transformed.y += sin(uTime * 0.09 + aPhase) * 0.018;
+          vec4 viewPosition = modelViewMatrix * vec4(transformed, 1.0);
+          gl_Position = projectionMatrix * viewPosition;
+          gl_PointSize = (1.25 + aSize * 1.7) * (17.0 / -viewPosition.z);
+          vColor = color;
+          vPulse = 0.52 + shimmer * 0.48;
+        }
+      `,
+      fragmentShader: `
+        precision mediump float;
+
+        varying vec3 vColor;
+        varying float vPulse;
+
+        void main() {
+          float radius = length(gl_PointCoord - 0.5);
+          if (radius > 0.5) discard;
+          float body = 1.0 - smoothstep(0.12, 0.5, radius);
+          float core = 1.0 - smoothstep(0.0, 0.12, radius);
+          gl_FragColor = vec4(
+            vColor * (0.76 + core * 0.55),
+            body * vPulse * 0.7
+          );
+        }
+      `,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      toneMapped: false,
+      vertexColors: true
+    })
+  );
+  const accretionField = new THREE.Points(
+    accretionGeometry,
+    accretionMaterial
+  );
+  accretionField.rotation.set(0.48, 0.1, -0.17);
+  scene.add(accretionField);
+
+  const starCount = isCompact ? 280 : 500;
   const starPositions = new Float32Array(starCount * 3);
   const starColors = new Float32Array(starCount * 3);
   for (let index = 0; index < starCount; index += 1) {
@@ -491,7 +596,7 @@ if (runtime) {
   deepField.add(stars);
   scene.add(deepField);
 
-  const signalCount = isCompact ? 36 : 92;
+  const signalCount = isCompact ? 28 : 64;
   const signalPositions = new Float32Array(signalCount * 3);
   const signalPhases = new Float32Array(signalCount);
   const signalRates = new Float32Array(signalCount);
@@ -546,7 +651,7 @@ if (runtime) {
         }
       `,
       fragmentShader: `
-        precision highp float;
+        precision mediump float;
 
         varying float vIntensity;
         varying float vWarmth;
@@ -554,6 +659,7 @@ if (runtime) {
         void main() {
           vec2 p = gl_PointCoord - 0.5;
           float distanceToCenter = length(p);
+          if (distanceToCenter > 0.5) discard;
           float softDisc = 1.0 - smoothstep(0.06, 0.5, distanceToCenter);
           float core = 1.0 - smoothstep(0.0, 0.12, distanceToCenter);
           vec3 cool = vec3(0.38, 0.72, 0.74);
@@ -579,40 +685,34 @@ if (runtime) {
   };
   window.addEventListener("resize", onResize, { passive: true });
 
-  const parallax = new THREE.Vector2();
   const cameraTarget = new THREE.Vector3();
   const baseInclinedRotation = new THREE.Euler(1.02, 0.1, -0.35);
   const basePolarRotation = new THREE.Euler(0.12, 1.08, 0.2);
-  let renderedReducedFrame = false;
+  let lastIdentityX = Number.NaN;
+  let lastIdentityY = Number.NaN;
   const animate = () => {
-    const { delta, elapsed } = runtime.tick();
+    const { elapsed } = runtime.tick();
     const reduced = prefersReducedMotion.matches;
     const time = reduced ? 18 : elapsed;
-    const parallaxEase = 1 - Math.exp(-delta * 2.15);
-
-    if (reduced) {
-      parallax.set(0, 0);
-    } else {
-      parallax.lerp(pointer, parallaxEase);
-    }
-
+    const inputX = reduced ? 0 : pointer.x;
+    const inputY = reduced ? 0 : pointer.y;
     const compactMotion = isCompact ? 0.62 : 1;
     camera.position.set(
-      parallax.x * 0.37 * compactMotion,
-      parallax.y * 0.27 * compactMotion,
+      inputX * 0.37 * compactMotion,
+      inputY * 0.27 * compactMotion,
       14.5
     );
     cameraTarget.set(
-      parallax.x * 0.045 * compactMotion,
-      parallax.y * 0.035 * compactMotion,
+      inputX * 0.045 * compactMotion,
+      inputY * 0.035 * compactMotion,
       0
     );
     camera.lookAt(cameraTarget);
 
     instrument.rotation.set(
-      parallax.y * -0.062 * compactMotion,
-      parallax.x * 0.086 * compactMotion,
-      parallax.x * -0.009 * compactMotion
+      inputY * -0.062 * compactMotion,
+      inputX * 0.086 * compactMotion,
+      inputX * -0.009 * compactMotion
     );
 
     dial.rotation.z = reduced
@@ -636,16 +736,41 @@ if (runtime) {
       : -time * 0.021 + Math.sin(time * 0.11) * 0.04;
     nearEcho.rotation.z = 0.8 + (reduced ? 0 : Math.sin(time * 0.23) * 0.035);
     farEcho.rotation.z = -2.1 + (reduced ? 0 : Math.cos(time * 0.17) * 0.028);
+    signalEchoes.position.z = -0.16;
+    signalEchoes.scale.setScalar(
+      reduced ? 1 : 1 + Math.sin(time * 0.16) * 0.004
+    );
     deepField.rotation.set(
-      parallax.y * 0.009 * compactMotion,
-      parallax.x * -0.013 * compactMotion,
+      inputY * 0.009 * compactMotion,
+      inputX * -0.013 * compactMotion,
       reduced ? -0.015 : -time * 0.00125
     );
+    stars.position.set(
+      inputX * -0.11 * compactMotion,
+      inputY * -0.08 * compactMotion,
+      0
+    );
+    signalDust.position.set(
+      inputX * 0.035 * compactMotion,
+      inputY * 0.025 * compactMotion,
+      0
+    );
     halo.position.set(
-      parallax.x * -0.045 * compactMotion,
-      parallax.y * -0.035 * compactMotion,
+      inputX * -0.045 * compactMotion,
+      inputY * -0.035 * compactMotion,
       -0.42
     );
+    accretionField.position.set(
+      inputX * -0.024 * compactMotion,
+      inputY * -0.018 * compactMotion,
+      0
+    );
+    accretionField.rotation.set(
+      0.48 + inputY * 0.018 * compactMotion,
+      0.1 + inputX * 0.025 * compactMotion,
+      reduced ? -0.17 : -0.17 - time * 0.014
+    );
+    accretionMaterial.uniforms.uTime.value = time;
 
     const markerAngle = reduced ? 1.12 : time * 0.19;
     marker.position.set(
@@ -668,40 +793,38 @@ if (runtime) {
     sweepHead.scale.setScalar(
       reduced ? 1 : 0.82 + Math.sin(time * 1.7) * 0.18
     );
+    rimMaterial.opacity = reduced
+      ? 0.16
+      : 0.145 + Math.sin(time * 0.51) * 0.018;
+    sweepMaterial.opacity = reduced
+      ? 0.58
+      : 0.54 + Math.sin(time * 0.37) * 0.06;
 
     haloMaterial.uniforms.uTime.value = time;
-    haloMaterial.uniforms.uPointer.value.copy(parallax);
+    haloMaterial.uniforms.uPointer.value.set(inputX, inputY);
     haloMaterial.uniforms.uSignal.value = reduced
       ? 0.35
       : 0.35 + Math.sin(time * 0.43) * 0.2;
     signalMaterial.uniforms.uTime.value = time;
-    signalMaterial.uniforms.uPointer.value.copy(parallax);
+    signalMaterial.uniforms.uPointer.value.set(inputX, inputY);
 
-    if (identity) {
-      if (reduced) {
-        identity.style.setProperty("--identity-x", "0px");
-        identity.style.setProperty("--identity-y", "0px");
-        identity.style.setProperty("--signal-luma", "1");
-      } else {
-        identity.style.setProperty(
-          "--identity-x",
-          `${(parallax.x * 4.2 * compactMotion).toFixed(2)}px`
-        );
-        identity.style.setProperty(
-          "--identity-y",
-          `${(parallax.y * -3.1 * compactMotion).toFixed(2)}px`
-        );
-        identity.style.setProperty(
-          "--signal-luma",
-          (0.985 + Math.sin(time * 0.43) * 0.015).toFixed(3)
-        );
-      }
+    if (
+      identity
+      && (inputX !== lastIdentityX || inputY !== lastIdentityY)
+    ) {
+      identity.style.setProperty(
+        "--identity-drift",
+        `translate3d(${(inputX * 4.2 * compactMotion).toFixed(2)}px, ${
+          (inputY * -3.1 * compactMotion).toFixed(2)
+        }px, 0)`
+      );
+      lastIdentityX = inputX;
+      lastIdentityY = inputY;
     }
 
     renderer.render(scene, camera);
 
     if (reduced) {
-      renderedReducedFrame = true;
       renderer.setAnimationLoop(null);
     }
   };
@@ -709,7 +832,6 @@ if (runtime) {
   renderer.setAnimationLoop(animate);
 
   const onMotionPreferenceChange = () => {
-    renderedReducedFrame = false;
     renderer.setAnimationLoop(animate);
   };
   prefersReducedMotion.addEventListener("change", onMotionPreferenceChange);
